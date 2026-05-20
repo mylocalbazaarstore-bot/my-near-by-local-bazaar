@@ -1,0 +1,35 @@
+# ─────────────────────────────────────────────────────────────
+# MyLocalBazaar Backend — .gitignore (Node.js / Express)
+# ─────────────────────────────────────────────────────────────
+
+# ── Dependencies ───────────────────────────────────────────────
+node_modules/
+
+# ── Environment — NEVER commit credentials ────────────────────
+# Use env.example as a safe template for teammates
+.env
+.env.local
+.env.*.local
+
+# ── Logs ───────────────────────────────────────────────────────
+*.log
+logs/
+dev-server.log
+
+# ── Redis persistence file ─────────────────────────────────────
+dump.rdb
+
+# ── Build / dist ───────────────────────────────────────────────
+dist/
+build/
+
+# ── TypeScript ─────────────────────────────────────────────────
+*.tsbuildinfo
+
+# ── OS / editor ────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+
+# ── Test coverage ─────────────────────────────────────────────
+coverage/

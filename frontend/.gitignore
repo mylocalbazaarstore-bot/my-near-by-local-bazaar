@@ -1,0 +1,35 @@
+# ─────────────────────────────────────────────────────────────
+# MyLocalBazaar Frontend — .gitignore (Next.js 14)
+# ─────────────────────────────────────────────────────────────
+
+# ── Next.js ────────────────────────────────────────────────────
+.next/
+out/
+
+# ── Dependencies ───────────────────────────────────────────────
+node_modules/
+
+# ── Environment — set these in Vercel project settings ────────
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ── Logs ───────────────────────────────────────────────────────
+*.log
+dev-server.log
+dev-frontend.log
+
+# ── TypeScript build cache ─────────────────────────────────────
+*.tsbuildinfo
+
+# ── Vercel ─────────────────────────────────────────────────────
+.vercel
+
+# ── Test coverage ─────────────────────────────────────────────
+coverage/
+
+# ── OS ─────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

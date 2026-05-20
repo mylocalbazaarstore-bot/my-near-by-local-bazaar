@@ -1,0 +1,1029 @@
+{
+  "info": {
+    "name": "MyLocalBazaar.store — Complete API Test Suite",
+    "description": "All Phase 1 + Phase 2 + Phase 3 endpoints\nBase URL: http://localhost:5000/api/v1\nCompany: Catalyst Service Private Limited\nVersion: 3.0.0",
+    "_postman_id": "mlb-api-v3",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "BASE_URL",         "value": "http://localhost:5000/api/v1" },
+    { "key": "CUSTOMER_TOKEN",   "value": "" },
+    { "key": "MERCHANT_TOKEN",   "value": "" },
+    { "key": "ADMIN_TOKEN",      "value": "" },
+    { "key": "DELIVERY_TOKEN",   "value": "" },
+    { "key": "CUSTOMER_PHONE",   "value": "9999999999" },
+    { "key": "MERCHANT_PHONE",   "value": "8888888888" },
+    { "key": "TEST_ORDER_ID",    "value": "" },
+    { "key": "TEST_PRODUCT_ID",  "value": "" },
+    { "key": "TEST_CART_ITEM_ID","value": "" }
+  ],
+  "item": [
+
+    {
+      "name": "🏥 HEALTH CHECK",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Version 3.0.0', () => {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.version).to.eql('3.0.0');",
+              "  pm.expect(json.services.database.status).to.eql('healthy');",
+              "  pm.expect(json.services.redis.status).to.eql('healthy');",
+              "});"
+            ]}
+          }],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/health"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🔐 PHASE 1 — AUTH",
+      "item": [
+        {
+          "name": "Customer — Send OTP",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('OTP sent', () => pm.expect(pm.response.json().data.sent).to.be.true);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/auth/customer/send-otp",
+            "body": { "mode": "raw", "raw": "{ \"phone\": \"{{CUSTOMER_PHONE}}\" }" }
+          }
+        },
+        {
+          "name": "Customer — Verify OTP (Dev: 123456)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const json = pm.response.json();",
+            "if (json.data && json.data.tokens) {",
+            "  pm.collectionVariables.set('CUSTOMER_TOKEN', json.data.tokens.access_token);",
+            "  pm.test('Token received', () => pm.expect(json.data.tokens.access_token).to.be.a('string'));",
+            "}"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/auth/customer/verify-otp",
+            "body": { "mode": "raw", "raw": "{ \"phone\": \"{{CUSTOMER_PHONE}}\", \"otp\": \"123456\" }" }
+          }
+        },
+        {
+          "name": "Merchant — Login",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const json = pm.response.json();",
+            "if (json.data && json.data.tokens) {",
+            "  pm.collectionVariables.set('MERCHANT_TOKEN', json.data.tokens.access_token);",
+            "}"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/auth/merchant/login",
+            "body": { "mode": "raw", "raw": "{ \"phone\": \"{{MERCHANT_PHONE}}\", \"password\": \"Test@1234\" }" }
+          }
+        },
+        {
+          "name": "Admin — Login (Step 1: Email+Password)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('2FA OTP sent', () => pm.expect(pm.response.json().data.otp_sent).to.be.true);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/auth/admin/login",
+            "body": { "mode": "raw", "raw": "{ \"email\": \"admin@mylocalbazaar.store\", \"password\": \"Admin@12345\" }" }
+          }
+        },
+        {
+          "name": "Admin — Verify 2FA OTP",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const json = pm.response.json();",
+            "if (json.data && json.data.tokens) {",
+            "  pm.collectionVariables.set('ADMIN_TOKEN', json.data.tokens.access_token);",
+            "}"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/auth/admin/verify-2fa",
+            "body": { "mode": "raw", "raw": "{ \"email\": \"admin@mylocalbazaar.store\", \"otp\": \"123456\" }" }
+          }
+        },
+        {
+          "name": "Customer — Get Profile (me)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Has user data', () => pm.expect(pm.response.json().data.user).to.exist);"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/auth/customer/me"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "📦 PHASE 1 — PRODUCTS & CATEGORIES",
+      "item": [
+        {
+          "name": "Get All Categories",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Has categories', () => {",
+            "  const data = pm.response.json().data;",
+            "  pm.expect(data).to.be.an('array').with.length.above(0);",
+            "});"
+          ]}}],
+          "request": { "method": "GET", "url": "{{BASE_URL}}/categories" }
+        },
+        {
+          "name": "Area Search — Kharghar",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": { "method": "GET", "url": "{{BASE_URL}}/areas/search?q=Kharghar" }
+        },
+        {
+          "name": "Area Search — By Pincode",
+          "request": { "method": "GET", "url": "{{BASE_URL}}/areas/pincode/410210" }
+        },
+        {
+          "name": "Merchants by Pincode",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const json = pm.response.json();",
+            "if (json.data && json.data.rows && json.data.rows.length > 0) {",
+            "  pm.collectionVariables.set('TEST_MERCHANT_ID', json.data.rows[0].id);",
+            "}"
+          ]}}],
+          "request": { "method": "GET", "url": "{{BASE_URL}}/merchants/by-pincode/410210?sort_by=rating&limit=5" }
+        },
+        {
+          "name": "Merchant — List Products",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const json = pm.response.json();",
+            "if (json.data && json.data.rows && json.data.rows.length > 0) {",
+            "  pm.collectionVariables.set('TEST_PRODUCT_ID', json.data.rows[0].id);",
+            "}"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{MERCHANT_TOKEN}}" }],
+            "url": "{{BASE_URL}}/merchant/products?limit=5"
+          }
+        },
+        {
+          "name": "Merchant — Create Product",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{MERCHANT_TOKEN}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/merchant/products",
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Test Product — Fresh Tomatoes 1kg\",\n  \"category_id\": \"REPLACE_WITH_CATEGORY_ID\",\n  \"mrp\": 50.00,\n  \"retail_price\": 40.00,\n  \"stock_quantity\": 100,\n  \"unit\": \"kg\",\n  \"moq\": 1,\n  \"gst_percentage\": 0\n}" }
+          }
+        },
+        {
+          "name": "Merchant — Dashboard Overview",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Has overview data', () => {",
+            "  const data = pm.response.json().data;",
+            "  pm.expect(data).to.exist;",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{MERCHANT_TOKEN}}" }],
+            "url": "{{BASE_URL}}/merchant/dashboard/overview?period=month"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🛒 PHASE 1 — CART & ORDERS (Double-Approval Flow)",
+      "item": [
+        {
+          "name": "1. Get Cart",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Cart structure valid', () => {",
+            "  const cart = pm.response.json().data.cart;",
+            "  pm.expect(cart).to.have.property('item_count');",
+            "  pm.expect(cart).to.have.property('totals');",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/cart"
+          }
+        },
+        {
+          "name": "2. Add Item to Cart",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "const json = pm.response.json();",
+            "if (json.data && json.data.cart_item) {",
+            "  pm.collectionVariables.set('TEST_CART_ITEM_ID', json.data.cart_item.id);",
+            "  pm.test('Cart item created', () => pm.expect(json.data.cart_item.id).to.exist);",
+            "}"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/cart/items",
+            "body": { "mode": "raw", "raw": "{ \"product_id\": \"{{TEST_PRODUCT_ID}}\", \"quantity\": 2 }" }
+          }
+        },
+        {
+          "name": "3. Update Cart Item Qty",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/cart/items/{{TEST_CART_ITEM_ID}}",
+            "body": { "mode": "raw", "raw": "{ \"quantity\": 3 }" }
+          }
+        },
+        {
+          "name": "4. Get Delivery Estimate",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/cart/delivery-charge?address_id=REPLACE_WITH_ADDRESS_ID"
+          }
+        },
+        {
+          "name": "5. Place Order — COD",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200 or 201', () => {",
+            "  pm.expect([200,201]).to.include(pm.response.code);",
+            "});",
+            "const json = pm.response.json();",
+            "if (json.data && json.data.order) {",
+            "  pm.collectionVariables.set('TEST_ORDER_ID', json.data.order.id);",
+            "  pm.test('Order ID set', () => pm.expect(json.data.order.id).to.exist);",
+            "}"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/orders",
+            "body": { "mode": "raw", "raw": "{\n  \"address_id\": \"REPLACE_WITH_ADDRESS_ID\",\n  \"payment_method\": \"cod\",\n  \"notes\": \"Postman test order\"\n}" }
+          }
+        },
+        {
+          "name": "6. Get My Orders",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Orders list exists', () => pm.expect(pm.response.json().data.rows).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/orders?limit=5"
+          }
+        },
+        {
+          "name": "7. [MERCHANT] Get Pending Orders",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "const data = pm.response.json().data;",
+            "pm.test('Pending orders structure', () => {",
+            "  pm.expect(data.count).to.be.a('number');",
+            "  pm.expect(data.orders).to.be.an('array');",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{MERCHANT_TOKEN}}" }],
+            "url": "{{BASE_URL}}/merchant/orders/pending"
+          }
+        },
+        {
+          "name": "8. [MERCHANT] Approve Order ★ Double-Approval",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Order approved', () => {",
+            "  const data = pm.response.json().data;",
+            "  pm.expect(data.order_status).to.eql('merchant_approved');",
+            "});"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{MERCHANT_TOKEN}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/merchant/orders/{{TEST_ORDER_ID}}/action",
+            "body": { "mode": "raw", "raw": "{ \"action\": \"approve\", \"estimated_delivery_minutes\": 30 }" }
+          }
+        },
+        {
+          "name": "9. [MERCHANT] Mark Order Packed",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{MERCHANT_TOKEN}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/merchant/orders/{{TEST_ORDER_ID}}/status",
+            "body": { "mode": "raw", "raw": "{ \"status\": \"packed\", \"note\": \"Order ready for pickup\" }" }
+          }
+        },
+        {
+          "name": "10. Get Order Detail (with OTP)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Order has timeline', () => {",
+            "  const order = pm.response.json().data.order;",
+            "  pm.expect(order.status_timeline).to.be.an('array').with.length.above(0);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/orders/{{TEST_ORDER_ID}}"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🛡️ PHASE 1 — ADMIN PANEL",
+      "item": [
+        {
+          "name": "Admin — Platform Analytics Overview",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Has GMV data', () => {",
+            "  const data = pm.response.json().data.overview;",
+            "  pm.expect(data.revenue).to.exist;",
+            "  pm.expect(data.orders).to.exist;",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ADMIN_TOKEN}}" }],
+            "url": "{{BASE_URL}}/admin/analytics/overview?period=month"
+          }
+        },
+        {
+          "name": "Admin — List Merchants (Pending Approval)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ADMIN_TOKEN}}" }],
+            "url": "{{BASE_URL}}/admin/merchants?status=pending&limit=10"
+          }
+        },
+        {
+          "name": "Admin — Fraud Signals",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Fraud signals array', () => {",
+            "  pm.expect(pm.response.json().data.signals).to.be.an('array');",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ADMIN_TOKEN}}" }],
+            "url": "{{BASE_URL}}/admin/analytics/fraud-signals"
+          }
+        },
+        {
+          "name": "Admin — Order Override",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ADMIN_TOKEN}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/admin/orders/{{TEST_ORDER_ID}}/override",
+            "body": { "mode": "raw", "raw": "{ \"target_status\": \"accepted\", \"note\": \"Admin override test from Postman\" }" }
+          }
+        },
+        {
+          "name": "Admin — Create Coupon",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ADMIN_TOKEN}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/admin/marketing/coupons",
+            "body": { "mode": "raw", "raw": "{\n  \"code\": \"TESTPOSTMAN20\",\n  \"coupon_type\": \"percentage\",\n  \"discount_value\": 20,\n  \"min_order_value\": 100,\n  \"max_uses\": 100,\n  \"uses_per_user\": 1,\n  \"valid_from\": \"2025-01-01\",\n  \"valid_until\": \"2026-12-31\"\n}" }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🚚 PHASE 2 — DELIVERY SYSTEM",
+      "item": [
+        {
+          "name": "Delivery — Send OTP (Register)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/delivery/auth/send-otp",
+            "body": { "mode": "raw", "raw": "{ \"phone\": \"7777777777\", \"purpose\": \"register\" }" }
+          }
+        },
+        {
+          "name": "Delivery — Login",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "const json = pm.response.json();",
+            "if (json.data && json.data.tokens) {",
+            "  pm.collectionVariables.set('DELIVERY_TOKEN', json.data.tokens.access_token);",
+            "}"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/delivery/auth/login",
+            "body": { "mode": "raw", "raw": "{ \"phone\": \"7777777777\", \"password\": \"Test@1234\" }" }
+          }
+        },
+        {
+          "name": "Delivery — Update GPS Location",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Location updated', () => pm.expect(pm.response.json().data.updated).to.be.true);"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{DELIVERY_TOKEN}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/delivery/location",
+            "body": { "mode": "raw", "raw": "{ \"latitude\": 19.0478, \"longitude\": 73.0690 }" }
+          }
+        },
+        {
+          "name": "Delivery — Go Online",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Is online', () => pm.expect(pm.response.json().data.is_online).to.be.true);"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{DELIVERY_TOKEN}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/delivery/status",
+            "body": { "mode": "raw", "raw": "{ \"is_online\": true }" }
+          }
+        },
+        {
+          "name": "Delivery — Get Active Assignments",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Assignments array', () => pm.expect(pm.response.json().data.assignments).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{DELIVERY_TOKEN}}" }],
+            "url": "{{BASE_URL}}/delivery/assignments/active"
+          }
+        },
+        {
+          "name": "Admin — Find Nearest Partners",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Partners array', () => pm.expect(pm.response.json().data.partners).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ADMIN_TOKEN}}" }],
+            "url": "{{BASE_URL}}/delivery/admin/available?latitude=19.0478&longitude=73.0690&radius_km=5"
+          }
+        },
+        {
+          "name": "Delivery — Get Earnings",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Has earnings data', () => {",
+            "  const earnings = pm.response.json().data.earnings;",
+            "  pm.expect(earnings.deliveries).to.exist;",
+            "  pm.expect(earnings.earnings).to.exist;",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{DELIVERY_TOKEN}}" }],
+            "url": "{{BASE_URL}}/delivery/earnings?period=week"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🔔 PHASE 2 — NOTIFICATIONS",
+      "item": [
+        {
+          "name": "Get Notifications",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Notifications array', () => pm.expect(pm.response.json().data.rows).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/notifications?limit=10"
+          }
+        },
+        {
+          "name": "Get Unread Count",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Count is number', () => pm.expect(pm.response.json().data.count).to.be.a('number'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/notifications/unread-count"
+          }
+        },
+        {
+          "name": "Mark All Read",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/notifications/read-all"
+          }
+        },
+        {
+          "name": "Register FCM Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/notifications/register-token",
+            "body": { "mode": "raw", "raw": "{ \"fcm_token\": \"test_fcm_token_from_postman\", \"device_type\": \"android\" }" }
+          }
+        },
+        {
+          "name": "Admin — Send SMS+Push Campaign",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ADMIN_TOKEN}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/notifications/admin/campaign",
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"🎉 Test Campaign from Postman!\",\n  \"body\": \"Get 20% off on your next order.\",\n  \"channel\": \"push\",\n  \"target_role\": \"customer\",\n  \"coupon_code\": \"TEST20\"\n}" }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "⭐ PHASE 2 — REVIEWS & WALLET",
+      "item": [
+        {
+          "name": "Get Wallet Balance",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Balance is number', () => {",
+            "  const wallet = pm.response.json().data.wallet;",
+            "  pm.expect(wallet.balance).to.be.a('string').or.a('number');",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/wallet"
+          }
+        },
+        {
+          "name": "Get Active Coupons",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Coupons array', () => pm.expect(pm.response.json().data.coupons).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/coupons"
+          }
+        },
+        {
+          "name": "Submit Product Review",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201 or 200', () => pm.expect([200,201]).to.include(pm.response.code));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/reviews",
+            "body": { "mode": "raw", "raw": "{\n  \"product_id\": \"{{TEST_PRODUCT_ID}}\",\n  \"rating\": 5,\n  \"title\": \"Excellent product!\",\n  \"body\": \"Fresh and delivered on time. Highly recommend!\"\n}" }
+          }
+        },
+        {
+          "name": "Get Product Reviews",
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/reviews/product/{{TEST_PRODUCT_ID}}"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "📱 PHASE 2 — MOBILE APIs",
+      "item": [
+        {
+          "name": "Customer Home (Aggregated)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('All sections present', () => {",
+            "  const data = pm.response.json().data;",
+            "  pm.expect(data.categories).to.be.an('array');",
+            "  pm.expect(data.merchants).to.be.an('array');",
+            "  pm.expect(data.wallet_balance).to.be.a('number');",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/mobile/customer/home"
+          }
+        },
+        {
+          "name": "Merchant Dashboard (Aggregated)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('All merchant sections', () => {",
+            "  const data = pm.response.json().data;",
+            "  pm.expect(data.pending_approvals).to.be.a('number');",
+            "  pm.expect(data.today).to.exist;",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{MERCHANT_TOKEN}}" }],
+            "url": "{{BASE_URL}}/mobile/merchant/dashboard"
+          }
+        },
+        {
+          "name": "Delivery Dashboard (Aggregated)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{DELIVERY_TOKEN}}" }],
+            "url": "{{BASE_URL}}/mobile/delivery/dashboard"
+          }
+        },
+        {
+          "name": "App Config (Feature Flags)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Config structure', () => {",
+            "  const config = pm.response.json().data.config;",
+            "  pm.expect(config.features).to.exist;",
+            "  pm.expect(config.min_app_version).to.exist;",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/mobile/app-config"
+          }
+        },
+        {
+          "name": "Toggle Store Open/Close",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('is_open is boolean', () => {",
+            "  pm.expect(pm.response.json().data.is_open).to.be.a('boolean');",
+            "});"
+          ]}}],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{MERCHANT_TOKEN}}" }],
+            "url": "{{BASE_URL}}/mobile/merchant/toggle-open"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "💎 PHASE 3 — SAAS SUBSCRIPTIONS",
+      "item": [
+        {
+          "name": "Get All Plans",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('4 plans returned', () => {",
+            "  const plans = pm.response.json().data.plans;",
+            "  pm.expect(plans).to.have.length(4);",
+            "  pm.expect(plans.map(p => p.plan)).to.include.members(['free','basic','pro','enterprise']);",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/saas/plans"
+          }
+        },
+        {
+          "name": "Get My Plan",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Plan has limits', () => {",
+            "  const plan = pm.response.json().data.plan;",
+            "  pm.expect(plan.plan).to.be.a('string');",
+            "  pm.expect(plan.limits).to.exist;",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{MERCHANT_TOKEN}}" }],
+            "url": "{{BASE_URL}}/saas/my-plan"
+          }
+        },
+        {
+          "name": "Feature Check — add_product",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Has allowed field', () => pm.expect(pm.response.json().data.allowed).to.be.a('boolean'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{MERCHANT_TOKEN}}" }],
+            "url": "{{BASE_URL}}/saas/feature-check/add_product"
+          }
+        },
+        {
+          "name": "Feature Check — analytics",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{MERCHANT_TOKEN}}" }],
+            "url": "{{BASE_URL}}/saas/feature-check/analytics"
+          }
+        },
+        {
+          "name": "Admin — Get SaaS Revenue (MRR/ARR)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Has MRR', () => pm.expect(pm.response.json().data.mrr).to.be.a('number'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ADMIN_TOKEN}}" }],
+            "url": "{{BASE_URL}}/saas/admin/revenue"
+          }
+        },
+        {
+          "name": "Admin — Grant Pro Plan to Merchant",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ADMIN_TOKEN}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/saas/admin/grant",
+            "body": { "mode": "raw", "raw": "{\n  \"merchant_id\": \"REPLACE_WITH_MERCHANT_ID\",\n  \"plan\": \"pro\",\n  \"months\": 1,\n  \"reason\": \"Test grant from Postman\"\n}" }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🤖 PHASE 3 — AI RECOMMENDATIONS",
+      "item": [
+        {
+          "name": "Personalised Recommendations (Home)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Has items and sections', () => {",
+            "  const data = pm.response.json().data;",
+            "  pm.expect(data.items).to.be.an('array');",
+            "  pm.expect(data.sections).to.exist;",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/ai/recommendations?context=home"
+          }
+        },
+        {
+          "name": "Trending in Area",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Items array', () => pm.expect(pm.response.json().data.items).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/ai/recommendations/trending?pincode=410210"
+          }
+        },
+        {
+          "name": "Similar Products",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/ai/recommendations/similar/{{TEST_PRODUCT_ID}}"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🏢 PHASE 3 — FRANCHISE & CRM",
+      "item": [
+        {
+          "name": "Franchise — Apply",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('Application submitted', () => pm.expect(pm.response.json().data.application.id).to.exist);"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/franchise/apply",
+            "body": { "mode": "raw", "raw": "{\n  \"applicant_name\": \"Rahul Sharma\",\n  \"email\": \"rahul@test.com\",\n  \"phone\": \"9988776655\",\n  \"city\": \"Pune\",\n  \"state\": \"Maharashtra\",\n  \"investment_capacity\": 500000,\n  \"business_experience\": \"5 years in retail\",\n  \"message\": \"Want to expand MyLocalBazaar to Pune\"\n}" }
+          }
+        },
+        {
+          "name": "Franchise — Get Territories",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Territories array', () => pm.expect(pm.response.json().data.territories).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/franchise/territories"
+          }
+        },
+        {
+          "name": "CRM — Platform Health",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Health data complete', () => {",
+            "  const health = pm.response.json().data.health;",
+            "  pm.expect(health.gmv).to.exist;",
+            "  pm.expect(health.users).to.exist;",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ADMIN_TOKEN}}" }],
+            "url": "{{BASE_URL}}/admin/crm/health"
+          }
+        },
+        {
+          "name": "CRM — Segment Summary (RFM)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('All RFM segments', () => {",
+            "  const counts = pm.response.json().data.crm.counts;",
+            "  pm.expect(counts.champions).to.be.a('number');",
+            "  pm.expect(counts.at_risk).to.be.a('number');",
+            "});"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ADMIN_TOKEN}}" }],
+            "url": "{{BASE_URL}}/admin/crm/summary"
+          }
+        },
+        {
+          "name": "CRM — Cohort Analysis",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Cohort array', () => pm.expect(pm.response.json().data.cohort).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{ADMIN_TOKEN}}" }],
+            "url": "{{BASE_URL}}/admin/crm/cohort"
+          }
+        },
+        {
+          "name": "Multi-City — List Active Cities",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('Cities array', () => pm.expect(pm.response.json().data.cities).to.be.an('array'));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/cities"
+          }
+        },
+        {
+          "name": "Multi-City — Onboard New City",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Status 201', () => pm.response.to.have.status(201));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{ADMIN_TOKEN}}" },
+              { "key": "Content-Type",   "value": "application/json" }
+            ],
+            "url": "{{BASE_URL}}/cities",
+            "body": { "mode": "raw", "raw": "{ \"name\": \"Pune Test\", \"state\": \"Maharashtra\" }" }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🔒 SECURITY TESTS",
+      "item": [
+        {
+          "name": "Access Admin Route Without Token",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Blocked — 401', () => pm.response.to.have.status(401));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "url": "{{BASE_URL}}/admin/merchants"
+          }
+        },
+        {
+          "name": "Customer Access Merchant Route",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Blocked — 403', () => pm.response.to.have.status(403));"
+          ]}}],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{CUSTOMER_TOKEN}}" }],
+            "url": "{{BASE_URL}}/merchant/orders/pending"
+          }
+        },
+        {
+          "name": "Invalid OTP Attempt",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Blocked — 400', () => pm.response.to.have.status(400));",
+            "pm.test('Error message present', () => pm.expect(pm.response.json().message).to.be.a('string'));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/auth/customer/verify-otp",
+            "body": { "mode": "raw", "raw": "{ \"phone\": \"9999999999\", \"otp\": \"000000\" }" }
+          }
+        },
+        {
+          "name": "Validation Error Test (missing required fields)",
+          "event": [{ "listen": "test", "script": { "exec": [
+            "pm.test('Blocked — 422', () => pm.response.to.have.status(422));"
+          ]}}],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{BASE_URL}}/orders",
+            "body": { "mode": "raw", "raw": "{ }" }
+          }
+        }
+      ]
+    }
+  ]
+}

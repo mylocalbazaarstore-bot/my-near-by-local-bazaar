@@ -1,0 +1,46 @@
+# ─────────────────────────────────────────────────────────────
+# MyLocalBazaar — Root .gitignore
+# Covers both frontend/ and mylocalbazaar-backend/ workspaces
+# ─────────────────────────────────────────────────────────────
+
+# ── Dependencies ───────────────────────────────────────────────
+node_modules/
+
+# ── Environment — NEVER commit secrets ────────────────────────
+.env
+.env.local
+.env.*.local
+!env.example
+!.env.example
+
+# ── Next.js build output ───────────────────────────────────────
+.next/
+out/
+
+# ── General build outputs ──────────────────────────────────────
+dist/
+build/
+
+# ── Logs ───────────────────────────────────────────────────────
+*.log
+logs/
+dev-server.log
+dev-frontend.log
+
+# ── Redis ──────────────────────────────────────────────────────
+dump.rdb
+
+# ── TypeScript build cache ─────────────────────────────────────
+*.tsbuildinfo
+
+# ── Vercel deployment artifacts ───────────────────────────────
+.vercel
+
+# ── OS / editor cruft ─────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/settings.json
+
+# ── Test coverage ─────────────────────────────────────────────
+coverage/
