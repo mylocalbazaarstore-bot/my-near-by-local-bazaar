@@ -775,6 +775,11 @@ export default function MerchantDashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    if (tab) setSection(tab);
+  }, []);
+
+  useEffect(() => {
     if (isHydrated && (!user || role !== 'merchant')) {
       router.replace('/merchant/login?redirect=/merchant-dashboard');
     }

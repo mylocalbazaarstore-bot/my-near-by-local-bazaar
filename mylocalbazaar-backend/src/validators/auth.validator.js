@@ -69,6 +69,13 @@ const customerVerifyOTP = Joi.object({
   purpose: Joi.string().valid('login', 'register', 'reset').default('login'),
 });
 
+// Step 2 (Firebase Phone Auth): Customer exchanges a verified Firebase
+// ID token for MyLocalBazaar session tokens
+const customerFirebaseLogin = Joi.object({
+  id_token: Joi.string().required()
+    .messages({ 'any.required': 'Firebase ID token is required' }),
+});
+
 // Step 3: Customer completes profile after first OTP login
 const customerCompleteProfile = Joi.object({
   full_name: Joi.string().min(2).max(200).trim().required()
@@ -131,6 +138,10 @@ const merchantVerifyOTP = Joi.object({
 
 // Step 3: Merchant full registration — called after OTP verified
 const merchantRegister = Joi.object({
+  // Proof of phone verification from /auth/merchant/verify-otp (purpose=register)
+  phone_verified_token: Joi.string().required()
+    .messages({ 'any.required': 'Phone verification token is required' }),
+
   // Owner details
   owner_name: Joi.string().min(2).max(200).trim().required()
     .messages({ 'any.required': 'Owner name is required' }),
@@ -270,6 +281,7 @@ module.exports = {
   // Customer
   customerSendOTP,
   customerVerifyOTP,
+  customerFirebaseLogin,
   customerCompleteProfile,
   customerUpdateProfile,
   customerAddAddress,
