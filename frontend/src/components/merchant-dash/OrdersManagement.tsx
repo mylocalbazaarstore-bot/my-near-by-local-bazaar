@@ -17,7 +17,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useMerchantOrders } from '@/hooks/useDashboard';
 import { StatusBadge, EmptyState, TableSkeleton, ConfirmModal } from '@/components/ui/DashboardPrimitives';
-import { apiPost } from '@/lib/api';
+import { apiPost, apiPatch } from '@/lib/api';
 import toast from 'react-hot-toast';
 
 dayjs.extend(relativeTime);
@@ -182,8 +182,8 @@ export default function OrdersManagement() {
   if (status) params.status = status;
 
   const { data, loading, refetch } = useMerchantOrders(params);
-  const orders = (data?.data as any)?.rows || [];
-  const meta   = (data?.data as any)?.meta || {};
+  const orders = (data?.data as any[]) || [];
+  const meta   = (data as any)?.meta || {};
 
   const handleAction = async (orderId: string, action: string, extra?: any) => {
     setActing(orderId);
@@ -195,7 +195,7 @@ export default function OrdersManagement() {
         });
         toast.success(action === 'approve' ? 'Order approved!' : 'Order rejected');
       } else if (action === 'status') {
-        await apiPost(`/merchant/orders/${orderId}/status`, extra);
+        await apiPatch(`/merchant/orders/${orderId}/status`, extra);
         toast.success(`Order status updated to ${extra.status.replace(/_/g, ' ')}`);
       }
       refetch();
@@ -216,6 +216,7 @@ export default function OrdersManagement() {
   const STATUS_TABS = [
     { key: '',                  label: 'All' },
     { key: 'payment_processed', label: '⏰ Needs Approval' },
+    { key: 'merchant_approved', label: 'Approved' },
     { key: 'accepted',          label: 'Accepted' },
     { key: 'packed',            label: 'Packed' },
     { key: 'out_for_delivery',  label: 'Delivering' },

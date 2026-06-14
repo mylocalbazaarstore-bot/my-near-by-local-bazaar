@@ -12,9 +12,11 @@
 //   GET /areas/:id/merchants           → Merchants in this area
 //   GET /merchants/by-pincode/:pincode → Merchants by pincode
 //   GET /merchants/by-coords           → Merchants by lat/lng
+//   GET /merchants/:slug               → Single merchant storefront detail
 //   POST /areas/verify-delivery        → Check delivery zone
 // ─────────────────────────────────────────────────────────────
 
+const { query } = require('../../config/db');
 const { AreaService, MerchantDiscoveryService } = require('../../services/area.service');
 const { success, notFound, badRequest, paginated } = require('../../utils/response');
 
@@ -150,6 +152,50 @@ const getMerchantsByCoords = async (req, res) => {
   return paginated(res, result, 'Merchants near your location');
 };
 
+// ── GET /merchants/:slug ───────────────────────────────────────
+// Single merchant storefront detail (header data for /store/[slug])
+const getMerchantBySlug = async (req, res) => {
+  const { slug } = req.params;
+
+  const { rows } = await query(
+    `SELECT
+       m.id, m.store_name, m.store_slug, m.store_category, m.store_description,
+       m.store_logo_url, m.store_banner_url,
+       m.address_line1, m.address_line2, m.landmark,
+       a.name AS area_name, m.pincode, c.name AS city_name, c.state,
+       m.latitude, m.longitude,
+       m.delivery_radius_km, m.min_order_value, m.is_open, m.merchant_status,
+       m.accepts_cod, m.emergency_booking, m.is_featured,
+       m.rating, m.total_reviews, m.created_at,
+       (SELECT COUNT(*) FROM products p
+        WHERE p.merchant_id = m.id AND p.product_status = 'active') AS active_products
+     FROM merchants m
+     LEFT JOIN areas a  ON a.id = m.area_id
+     LEFT JOIN cities c ON c.id = a.city_id
+     WHERE m.store_slug = $1 AND m.merchant_status = 'active'
+     LIMIT 1`,
+    [slug]
+  );
+
+  if (!rows[0]) return notFound(res, 'Store not found');
+  const merchant = rows[0];
+
+  merchant.address = [merchant.address_line1, merchant.address_line2, merchant.landmark]
+    .filter(Boolean)
+    .join(', ');
+
+  const { rows: opening_hours } = await query(
+    `SELECT day_of_week, open_time, close_time, is_closed
+     FROM merchant_operating_hours
+     WHERE merchant_id = $1
+     ORDER BY day_of_week ASC`,
+    [merchant.id]
+  );
+  merchant.opening_hours = opening_hours;
+
+  return success(res, { merchant }, 'Store details fetched');
+};
+
 // ── POST /areas/verify-delivery ───────────────────────────────
 // Body: { merchant_id, address_id }
 // Used at cart checkout to confirm merchant delivers to customer's address
@@ -188,5 +234,6 @@ module.exports = {
   getMerchantsByArea,
   getMerchantsByPincode,
   getMerchantsByCoords,
+  getMerchantBySlug,
   verifyDelivery,
 };

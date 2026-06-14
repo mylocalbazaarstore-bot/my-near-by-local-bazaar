@@ -129,10 +129,10 @@ function OrderStatusDonut({ overview }: { overview: any }) {
   if (!orders) return <div className="skeleton h-56 rounded-xl" />;
 
   const pieData = [
-    { name: 'Delivered',    value: orders.delivered        || 0, color: CHART_COLORS.green  },
-    { name: 'In Progress',  value: orders.in_progress      || 0, color: CHART_COLORS.blue   },
-    { name: 'Pending',      value: orders.awaiting_merchant|| 0, color: CHART_COLORS.orange },
-    { name: 'Cancelled',    value: orders.cancelled        || 0, color: CHART_COLORS.red    },
+    { name: 'Delivered',    value: orders.delivered         || 0, color: CHART_COLORS.green  },
+    { name: 'In Progress',  value: orders.in_progress       || 0, color: CHART_COLORS.blue   },
+    { name: 'Pending',      value: orders.awaiting_approval || 0, color: CHART_COLORS.orange },
+    { name: 'Cancelled',    value: orders.cancelled         || 0, color: CHART_COLORS.red    },
   ].filter((d) => d.value > 0);
 
   const total = pieData.reduce((s, d) => s + d.value, 0);
@@ -358,8 +358,8 @@ export default function AnalyticsDashboard() {
   const kpis = overview ? [
     {
       label:  'Revenue This Period',
-      value:  `₹${Number(overview.revenue?.period_gmv || 0).toFixed(0)}`,
-      sub:    `Total GMV: ₹${Number(overview.revenue?.total_gmv || 0).toFixed(0)}`,
+      value:  `₹${Number(overview.revenue?.this_period || 0).toFixed(0)}`,
+      sub:    `Total Revenue: ₹${Number(overview.revenue?.total || 0).toFixed(0)}`,
       icon:   IndianRupee,
       color:  'green' as const,
       trend:  { value: 12, label: 'vs last period' },
@@ -446,9 +446,9 @@ export default function AnalyticsDashboard() {
           <h3 className="font-bold text-surface-900 mb-3">Wallet Snapshot</h3>
           <div className="grid grid-cols-3 gap-4 text-center">
             {[
-              { label: 'Available Balance', value: `₹${Number(overview.wallet.balance).toFixed(2)}`, color: 'text-brand-green' },
-              { label: 'Locked (Pending)', value: `₹${Number(overview.wallet.locked_balance).toFixed(2)}`, color: 'text-brand-orange' },
-              { label: 'Total Earned',     value: `₹${Number(overview.wallet.total_credited).toFixed(2)}`, color: 'text-blue-500' },
+              { label: 'Available Balance', value: `₹${Number(overview.wallet.balance || 0).toFixed(2)}`, color: 'text-brand-green' },
+              { label: 'Locked (Pending)', value: `₹${Number(overview.wallet.locked_balance || 0).toFixed(2)}`, color: 'text-brand-orange' },
+              { label: 'Total Earned',     value: `₹${Number(overview.wallet.total_credited || 0).toFixed(2)}`, color: 'text-blue-500' },
             ].map(({ label, value, color }) => (
               <div key={label}>
                 <p className={clsx('font-display text-2xl font-bold', color)}>{value}</p>

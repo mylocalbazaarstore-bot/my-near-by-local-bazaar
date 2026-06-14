@@ -32,24 +32,35 @@ export interface CartTotals {
   total:           number;
 }
 
+export interface AddItemResult {
+  cart_item:     any;
+  store_name:    string;
+  cart_switched: boolean;
+}
+
 interface CartStore {
   items:      CartItemLocal[];
   totals:     CartTotals | null;
   itemCount:  number;
+  merchantId: string | null;
+  storeName:  string | null;
   loading:    boolean;
   drawerOpen: boolean;
 
   openDrawer:  () => void;
   closeDrawer: () => void;
   fetchCart:   () => Promise<void>;
-  addItem:     (productId: string, moq?: number, variantId?: string) => Promise<void>;
+  addItem:     (productId: string, moq?: number, variantId?: string) => Promise<AddItemResult>;
   updateQty:   (cartItemId: string, qty: number, moq?: number) => Promise<void>;
   removeItem:  (cartItemId: string) => Promise<void>;
   clearCart:   () => Promise<void>;
 }
 
 // ── Normalise raw API cart into local shape ────────────────────
-function normalise(raw: any): { items: CartItemLocal[]; totals: CartTotals; itemCount: number } {
+function normalise(raw: any): {
+  items: CartItemLocal[]; totals: CartTotals; itemCount: number;
+  merchantId: string | null; storeName: string | null;
+} {
   const items: CartItemLocal[] = (raw?.items || []).map((i: any) => ({
     cart_item_id: i.cart_item_id,
     product_id:   i.product_id,
@@ -72,7 +83,12 @@ function normalise(raw: any): { items: CartItemLocal[]; totals: CartTotals; item
     total:           Number(raw?.totals?.total           ?? 0),
   };
 
-  return { items, totals, itemCount: items.reduce((acc, i) => acc + i.quantity, 0) };
+  return {
+    items, totals,
+    itemCount:  items.reduce((acc, i) => acc + i.quantity, 0),
+    merchantId: raw?.merchant_id || null,
+    storeName:  raw?.merchant?.store_name || null,
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -82,6 +98,8 @@ export const useCartStore = create<CartStore>((set, get) => ({
   items:      [],
   totals:     null,
   itemCount:  0,
+  merchantId: null,
+  storeName:  null,
   loading:    false,
   drawerOpen: false,
 
@@ -102,12 +120,13 @@ export const useCartStore = create<CartStore>((set, get) => ({
   addItem: async (productId, moq = 1, variantId) => {
     // Enforce MOQ: minimum quantity = product.moq (floor at 1)
     const qty = Math.max(Number(moq) || 1, 1);
-    await apiPost('/cart/items', {
+    const res = await apiPost<AddItemResult>('/cart/items', {
       product_id: productId,
       quantity:   qty,
       ...(variantId ? { variant_id: variantId } : {}),
     });
     await get().fetchCart();
+    return res.data;
   },
 
   updateQty: async (cartItemId, qty, moq = 1) => {

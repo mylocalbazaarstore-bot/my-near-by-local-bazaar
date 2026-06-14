@@ -24,7 +24,7 @@ import { useMerchantProducts } from '@/hooks/useDashboard';
 import {
   StatusBadge, EmptyState, ConfirmModal, TableSkeleton, Alert,
 } from '@/components/ui/DashboardPrimitives';
-import { apiPost, apiGet } from '@/lib/api';
+import { api, apiPost, apiGet } from '@/lib/api';
 import toast from 'react-hot-toast';
 
 // ── Status filter options ──────────────────────────────────────
@@ -39,8 +39,8 @@ const STATUS_FILTERS = [
 
 // ── Inline stock editor ────────────────────────────────────────
 function StockEditor({
-  productId, currentStock, onSave,
-}: { productId: string; currentStock: number; onSave: (n: number) => void }) {
+  currentStock, onSave,
+}: { currentStock: number; onSave: (n: number) => Promise<void> }) {
   const [editing, setEditing] = useState(false);
   const [value,   setValue]   = useState(currentStock);
   const [saving,  setSaving]  = useState(false);
@@ -48,10 +48,7 @@ function StockEditor({
   const save = async () => {
     setSaving(true);
     try {
-      await import('@/lib/api').then(({ apiPatch }) =>
-        apiPatch(`/merchant/products/${productId}/stock`, { stock_quantity: value })
-      );
-      onSave(value);
+      await onSave(value);
       setEditing(false);
       toast.success('Stock updated');
     } catch {
@@ -101,30 +98,55 @@ function StockEditor({
   );
 }
 
-// ── Add Product Form (Slide-Over) ──────────────────────────────
-function AddProductForm({
-  open, onClose, onSuccess, categories,
+// ── Add / Edit Product Form (Slide-Over) ───────────────────────
+const EMPTY_FORM = {
+  name:          '',
+  description:   '',
+  category_id:   '',
+  mrp:           '',
+  retail_price:  '',
+  stock_quantity: '0',
+  unit:          'piece',
+  brand:         '',
+  gst_percentage:'0',
+  moq:           '1',
+  is_returnable: true,
+};
+
+function ProductForm({
+  open, editProduct, onClose, onSuccess, categories,
 }: {
-  open: boolean; onClose: () => void; onSuccess: () => void;
+  open: boolean; editProduct: any | null; onClose: () => void; onSuccess: () => void;
   categories: { id: string; name: string }[];
 }) {
-  const [form, setForm] = useState({
-    name:          '',
-    description:   '',
-    category_id:   '',
-    mrp:           '',
-    retail_price:  '',
-    stock_quantity: '0',
-    unit:          'piece',
-    brand:         '',
-    gst_percentage:'0',
-    moq:           '1',
-    is_returnable: true,
-  });
+  const isEdit = !!editProduct;
+  const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState('');
 
-  const submit = async (asDraft = false) => {
+  useEffect(() => {
+    if (!open) return;
+    if (editProduct) {
+      setForm({
+        name:           editProduct.name || '',
+        description:    editProduct.description || '',
+        category_id:    editProduct.category_id || '',
+        mrp:            String(editProduct.mrp ?? ''),
+        retail_price:   String(editProduct.retail_price ?? ''),
+        stock_quantity: String(editProduct.stock_quantity ?? '0'),
+        unit:           editProduct.unit || 'piece',
+        brand:          editProduct.brand || '',
+        gst_percentage: String(editProduct.gst_percentage ?? '0'),
+        moq:            String(editProduct.moq ?? '1'),
+        is_returnable:  editProduct.is_returnable ?? true,
+      });
+    } else {
+      setForm(EMPTY_FORM);
+    }
+    setError('');
+  }, [open, editProduct]);
+
+  const submit = async () => {
     if (!form.name || !form.mrp || !form.retail_price || !form.category_id) {
       setError('Name, category, MRP, and selling price are required.');
       return;
@@ -132,48 +154,29 @@ function AddProductForm({
     setError('');
     setSubmitting(true);
     try {
-      await apiPost('/merchant/products', {
+      const payload = {
         ...form,
         mrp:            parseFloat(form.mrp),
         retail_price:   parseFloat(form.retail_price),
         stock_quantity: parseInt(form.stock_quantity),
         gst_percentage: parseFloat(form.gst_percentage),
         moq:            parseInt(form.moq),
-      });
-      toast.success(asDraft ? 'Saved as draft!' : 'Product submitted for approval!');
+      };
+      if (isEdit) {
+        await api.put(`/merchant/products/${editProduct.id}`, payload);
+        toast.success('Product updated successfully!');
+      } else {
+        await apiPost('/merchant/products', payload);
+        toast.success('Product submitted for approval!');
+      }
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to create product');
+      setError(err?.response?.data?.message || `Failed to ${isEdit ? 'update' : 'create'} product`);
     } finally {
       setSubmitting(false);
     }
   };
-
-  const field = (label: string, key: keyof typeof form, type = 'text', opts?: string[]) => (
-    <div key={key}>
-      <label className="block text-xs font-bold text-surface-500 uppercase tracking-wider mb-1.5">
-        {label}
-      </label>
-      {opts ? (
-        <select
-          value={form[key] as string}
-          onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-          className="input-field text-sm"
-        >
-          <option value="">Select {label}</option>
-          {opts.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
-      ) : (
-        <input
-          type={type} value={form[key] as string}
-          onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-          className="input-field text-sm"
-          placeholder={label}
-        />
-      )}
-    </div>
-  );
 
   return (
     <AnimatePresence>
@@ -199,12 +202,16 @@ function AddProductForm({
                 <X className="w-5 h-5 text-surface-600" />
               </button>
               <div>
-                <h2 className="font-display font-bold text-surface-900">Add New Product</h2>
-                <p className="text-xs text-surface-500">Submitted for admin approval</p>
+                <h2 className="font-display font-bold text-surface-900">
+                  {isEdit ? 'Edit Product' : 'Add New Product'}
+                </h2>
+                <p className="text-xs text-surface-500">
+                  {isEdit ? 'Update your product details' : 'Submitted for admin approval'}
+                </p>
               </div>
               <div className="ml-auto flex items-center gap-2">
                 <span className="badge bg-yellow-100 text-yellow-700 text-[10px]">
-                  Pending Approval after submit
+                  {isEdit ? 'May require re-approval' : 'Pending Approval after submit'}
                 </span>
               </div>
             </div>
@@ -385,11 +392,13 @@ function AddProductForm({
               <button onClick={onClose} className="btn-ghost flex-1 text-sm">Cancel</button>
               <button
                 disabled={submitting}
-                onClick={() => submit()}
+                onClick={submit}
                 className="btn-primary flex-1 text-sm"
               >
                 {submitting ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</>
+                  <><Loader2 className="w-4 h-4 animate-spin" /> {isEdit ? 'Saving…' : 'Submitting…'}</>
+                ) : isEdit ? (
+                  <><Save className="w-4 h-4" /> Save Changes</>
                 ) : (
                   <><CheckCircle2 className="w-4 h-4" /> Submit for Approval</>
                 )}
@@ -411,6 +420,8 @@ export default function ProductsTable() {
   const [page,         setPage]         = useState(1);
   const [sortBy,       setSortBy]       = useState('created_at');
   const [addOpen,      setAddOpen]      = useState(false);
+  const [editProduct,  setEditProduct]  = useState<any | null>(null);
+  const [editLoading,  setEditLoading]  = useState<string | null>(null);
   const [archiveId,    setArchiveId]    = useState<string | null>(null);
   const [archiving,    setArchiving]    = useState(false);
 
@@ -421,8 +432,8 @@ export default function ProductsTable() {
   if (search)       params.search = search;
 
   const { data, loading, refetch, archiveProduct, updateStock } = useMerchantProducts(params);
-  const products = (data?.data as any)?.rows || MOCK_PRODUCTS;
-  const meta     = (data?.data as any)?.meta || {};
+  const products = (data?.data as any[]) || MOCK_PRODUCTS;
+  const meta     = (data as any)?.meta || {};
 
   // Categories — loaded live from API; falls back to seeded list with real UUIDs
   const [categories, setCategories] = useState<{ id: string; name: string }[]>(LIVE_CATEGORIES);
@@ -447,6 +458,18 @@ export default function ProductsTable() {
       toast.error('Failed to archive');
     } finally {
       setArchiving(false);
+    }
+  };
+
+  const handleEdit = async (productId: string) => {
+    setEditLoading(productId);
+    try {
+      const res = await apiGet<any>(`/merchant/products/${productId}`);
+      setEditProduct((res.data as any)?.product || null);
+    } catch {
+      toast.error('Failed to load product details');
+    } finally {
+      setEditLoading(null);
     }
   };
 
@@ -592,7 +615,6 @@ export default function ProductsTable() {
                 {/* Stock — inline editable */}
                 <div>
                   <StockEditor
-                    productId={product.id}
                     currentStock={product.stock_quantity}
                     onSave={(n) => updateStock(product.id, n)}
                   />
@@ -627,6 +649,17 @@ export default function ProductsTable() {
                     <Eye className="w-4 h-4" />
                   </button>
                   <button
+                    title="Edit product"
+                    onClick={() => handleEdit(product.id)}
+                    disabled={editLoading === product.id}
+                    className="p-1.5 rounded-lg hover:bg-surface-100 transition-colors text-surface-400
+                               hover:text-brand-orange disabled:opacity-50"
+                  >
+                    {editLoading === product.id
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <Edit3 className="w-4 h-4" />}
+                  </button>
+                  <button
                     title="Archive product"
                     onClick={() => setArchiveId(product.id)}
                     className="p-1.5 rounded-lg hover:bg-red-50 transition-colors text-surface-400
@@ -656,11 +689,12 @@ export default function ProductsTable() {
         </div>
       )}
 
-      {/* Add product form */}
-      <AddProductForm
-        open={addOpen}
-        onClose={() => setAddOpen(false)}
-        onSuccess={() => { refetch(); setAddOpen(false); }}
+      {/* Add / Edit product form */}
+      <ProductForm
+        open={addOpen || !!editProduct}
+        editProduct={editProduct}
+        onClose={() => { setAddOpen(false); setEditProduct(null); }}
+        onSuccess={() => { refetch(); setAddOpen(false); setEditProduct(null); }}
         categories={categories}
       />
 

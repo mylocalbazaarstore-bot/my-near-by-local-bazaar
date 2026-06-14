@@ -186,6 +186,81 @@ const ProductService = {
   },
 
   // ═════════════════════════════════════════════════════════════
+  // READ — Paginated list for customer storefront (public)
+  // ═════════════════════════════════════════════════════════════
+  getMerchantProducts: async (merchantId, filters = {}, pagination = {}) => {
+    const {
+      category_id, subcategory_id, search,
+      min_price, max_price, in_stock,
+      sort_by = 'created_at', sort_order = 'desc',
+    } = filters;
+
+    const params  = [merchantId];
+    const clauses = [
+      'p.merchant_id = $1',
+      "p.product_status = 'active'",
+      "m.merchant_status = 'active'",
+    ];
+
+    if (category_id) {
+      params.push(category_id);
+      clauses.push(`p.category_id = $${params.length}`);
+    }
+    if (subcategory_id) {
+      params.push(subcategory_id);
+      clauses.push(`p.subcategory_id = $${params.length}`);
+    }
+    if (search) {
+      params.push(search);
+      clauses.push(`p.search_vector @@ plainto_tsquery('english', $${params.length})`);
+    }
+    if (min_price !== undefined) {
+      params.push(min_price);
+      clauses.push(`p.retail_price >= $${params.length}`);
+    }
+    if (max_price !== undefined) {
+      params.push(max_price);
+      clauses.push(`p.retail_price <= $${params.length}`);
+    }
+    if (in_stock === true) {
+      clauses.push('p.stock_quantity > 0');
+    }
+
+    const sortCols = {
+      created_at:   'p.created_at',
+      retail_price: 'p.retail_price',
+      name:         'p.name',
+      rating:       'p.is_featured',
+    };
+    const safeSort  = sortCols[sort_by]    || 'p.created_at';
+    const safeOrder = sort_order === 'asc' ? 'ASC' : 'DESC';
+
+    return queryPaginated(
+      `SELECT
+         p.id, p.name, p.slug, p.short_description,
+         p.mrp, p.retail_price, p.wholesale_price, p.moq,
+         p.stock_quantity, p.unit, p.brand,
+         p.gst_percentage, p.is_featured, p.is_returnable,
+         p.return_window_days, p.tags,
+         m.id AS merchant_id, m.store_name, m.store_slug,
+         m.rating AS merchant_rating, m.delivery_radius_km,
+         m.min_order_value, m.is_open, m.accepts_cod,
+         c.name AS category_name, c.slug AS category_slug,
+         (SELECT image_url FROM product_images pi
+          WHERE pi.product_id = p.id AND pi.is_primary = true LIMIT 1) AS primary_image,
+         (SELECT COUNT(*) FROM product_variants pv
+          WHERE pv.product_id = p.id AND pv.is_active = true) AS variant_count
+       FROM products p
+       JOIN merchants m ON m.id = p.merchant_id
+       LEFT JOIN categories c ON c.id = p.category_id
+       WHERE ${clauses.join(' AND ')}
+       ORDER BY p.is_featured DESC, p.is_sponsored DESC, ${safeSort} ${safeOrder}`,
+      params,
+      pagination
+    );
+  },
+
+  // ═════════════════════════════════════════════════════════════
   // READ — Paginated list for merchant dashboard
   // ═════════════════════════════════════════════════════════════
   listForMerchant: async (merchantId, filters = {}, pagination = {}) => {

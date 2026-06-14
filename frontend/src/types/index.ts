@@ -78,6 +78,89 @@ export interface Merchant {
   active_products?:  number;
 }
 
+// ── Merchant Storefront ───────────────────────────────────────
+export interface MerchantOperatingHour {
+  day_of_week: number;   // 0 = Sunday … 6 = Saturday
+  open_time:   string;   // "09:00:00"
+  close_time:  string;   // "21:00:00"
+  is_closed:   boolean;
+}
+
+export interface MerchantDetail {
+  id:                 string;
+  store_name:         string;
+  store_slug:         string;
+  store_category:     string;
+  store_description?: string;
+  store_logo_url?:    string;
+  store_banner_url?:  string;
+  address_line1?:     string;
+  address_line2?:     string;
+  landmark?:          string;
+  address:            string;
+  area_name?:         string;
+  pincode:            string;
+  city_name?:         string;
+  state?:             string;
+  latitude:           number;
+  longitude:          number;
+  delivery_radius_km: number;
+  min_order_value:    number;
+  is_open:            boolean;
+  merchant_status:    string;
+  accepts_cod:        boolean;
+  emergency_booking:  boolean;
+  is_featured:        boolean;
+  rating:             number;
+  total_reviews:      number;
+  active_products:    number;
+  created_at:         string;
+  opening_hours:      MerchantOperatingHour[];
+}
+
+// ── Merchant-scoped Product (storefront listing) ────────────────
+export interface MerchantProduct {
+  id:                  string;
+  name:                string;
+  slug:                string;
+  short_description?:  string;
+  mrp:                 number;
+  retail_price:        number;
+  wholesale_price?:    number;
+  moq:                 number;
+  stock_quantity:      number;
+  unit:                string;
+  brand?:              string;
+  gst_percentage:      number;
+  is_featured:         boolean;
+  is_returnable:       boolean;
+  return_window_days?: number;
+  tags?:               string[];
+  merchant_id:         string;
+  store_name:          string;
+  store_slug:          string;
+  merchant_rating:     number;
+  delivery_radius_km:  number;
+  min_order_value:     number;
+  is_open:             boolean;
+  accepts_cod:         boolean;
+  primary_image?:      string;
+  variant_count:       number;
+  category_name?:      string;
+  category_slug?:      string;
+}
+
+// ── Merchant Review ──────────────────────────────────────────
+export interface MerchantReview {
+  id:            string;
+  rating:        number;
+  title?:        string;
+  body?:         string;
+  is_verified:   boolean;
+  created_at:    string;
+  reviewer_name: string;
+}
+
 // ── Products ──────────────────────────────────────────────────
 export interface Product {
   id:                string;
@@ -150,6 +233,55 @@ export interface ValidationWarning {
   message:   string;
   available?: number;
   moq?:      number;
+}
+
+// ── Wishlist ──────────────────────────────────────────────────
+export interface WishlistProduct {
+  id:             string;
+  name:           string;
+  slug:           string;
+  mrp:            number;
+  retail_price:   number;
+  stock_quantity: number;
+  moq:            number;
+  primary_image?: string;
+  merchant: {
+    id:         string;
+    store_name: string;
+    store_slug: string;
+  };
+}
+
+// ── Wallet ────────────────────────────────────────────────────
+export interface WalletTransaction {
+  id:               string;
+  transaction_type: 'credit' | 'debit';
+  amount:           number;
+  closing_balance:  number;
+  reference_type?:  string;
+  reference_id?:    string;
+  description?:     string;
+  created_at:       string;
+}
+
+export interface Wallet {
+  balance:              number;
+  locked_balance:       number;
+  total_credited:       number;
+  total_debited:        number;
+  recent_transactions?: WalletTransaction[];
+}
+
+// ── Customer Profile ────────────────────────────────────────────
+export interface CustomerProfile {
+  id:             string;
+  full_name:      string;
+  email?:         string;
+  phone:          string;
+  gender?:        'male' | 'female' | 'other' | 'prefer_not_to_say';
+  date_of_birth?: string;
+  referral_code:  string;
+  wallet_balance: number;
 }
 
 // ── Pagination ────────────────────────────────────────────────

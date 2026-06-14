@@ -9,14 +9,16 @@
 //   Food: Orange + Red | etc.
 // ─────────────────────────────────────────────────────────────
 
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { motion, useInView } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
-import { CATEGORIES, type CategoryUIConfig } from '@/types';
+import { apiGet } from '@/lib/api';
+import { CATEGORIES, type CategoryUIConfig, type Category } from '@/types';
 
 // ── Individual Category Card ──────────────────────────────────
-function CategoryCard({ cat, index }: { cat: CategoryUIConfig; index: number }) {
+// `count` = live merchant count for this category (undefined = still loading)
+function CategoryCard({ cat, index, count }: { cat: CategoryUIConfig; index: number; count?: number }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
@@ -73,6 +75,18 @@ function CategoryCard({ cat, index }: { cat: CategoryUIConfig; index: number }) 
                           translate-x-2 group-hover:translate-x-0
                           transition-all duration-300">
             <ArrowRight className="w-3.5 h-3.5 text-white" />
+          </div>
+
+          {/* Live merchant count badge */}
+          <div className="absolute bottom-2.5 left-2.5">
+            {count === undefined ? (
+              <div className="h-4 w-16 rounded-full bg-white/20 animate-pulse" />
+            ) : (
+              <span className="text-[10px] font-bold text-white bg-black/20
+                                backdrop-blur-sm rounded-full px-2 py-0.5">
+                {count} {count === 1 ? 'store' : 'stores'}
+              </span>
+            )}
           </div>
         </div>
 
@@ -141,6 +155,23 @@ export default function CategoryGrid() {
   const sectionRef = useRef<HTMLDivElement>(null);
   const inView     = useInView(sectionRef, { once: true, margin: '-80px' });
 
+  // Live merchant counts per category slug — undefined while loading
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [countsLoaded, setCountsLoaded] = useState(false);
+
+  useEffect(() => {
+    apiGet<{ categories: Category[] }>('/categories')
+      .then((res) => {
+        const map: Record<string, number> = {};
+        (res.data.categories || []).forEach((c) => {
+          map[c.slug] = Number(c.active_merchant_count) || 0;
+        });
+        setCounts(map);
+      })
+      .catch(() => { /* graceful degradation — counts simply stay empty */ })
+      .finally(() => setCountsLoaded(true));
+  }, []);
+
   // Split into two rows with the promo banner between them
   const firstRow  = CATEGORIES.slice(0, 7);
   const secondRow = CATEGORIES.slice(7);
@@ -187,7 +218,7 @@ export default function CategoryGrid() {
         {/* ── First row: 7 categories ──────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-3">
           {firstRow.map((cat, i) => (
-            <CategoryCard key={cat.slug} cat={cat} index={i} />
+            <CategoryCard key={cat.slug} cat={cat} index={i} count={countsLoaded ? counts[cat.slug] ?? 0 : undefined} />
           ))}
         </div>
 
@@ -199,7 +230,7 @@ export default function CategoryGrid() {
         {/* ── Second row: 6 categories ─────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {secondRow.map((cat, i) => (
-            <CategoryCard key={cat.slug} cat={cat} index={i + 7} />
+            <CategoryCard key={cat.slug} cat={cat} index={i + 7} count={countsLoaded ? counts[cat.slug] ?? 0 : undefined} />
           ))}
         </div>
 

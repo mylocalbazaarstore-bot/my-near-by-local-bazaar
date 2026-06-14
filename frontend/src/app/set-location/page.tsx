@@ -8,6 +8,7 @@ import { MapPin, Search, Loader2, ArrowRight, CheckCircle2 } from 'lucide-react'
 import { apiGet, getErrorMessage } from '@/lib/api';
 import { apiPost } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
+import { useLocationStore } from '@/store/locationStore';
 import toast from 'react-hot-toast';
 
 const QUICK_AREAS = [
@@ -22,6 +23,7 @@ const QUICK_AREAS = [
 export default function SetLocationPage() {
   const router                  = useRouter();
   const { user }                = useAuthStore();
+  const location                = useLocationStore();
   const [query,    setQuery]    = useState('');
   const [results,  setResults]  = useState<any[]>([]);
   const [loading,  setLoading]  = useState(false);
@@ -52,6 +54,13 @@ export default function SetLocationPage() {
   const handleSelect = async (area: any) => {
     setSelected(area);
     localStorage.setItem('mlb_selected_area', JSON.stringify(area));
+    location.setLocation({
+      areaId:   area.id ?? null,
+      areaName: area.name ?? null,
+      pincode:  area.pincode ?? null,
+      lat:      area.latitude ?? null,
+      lng:      area.longitude ?? null,
+    });
 
     // If logged in, save to backend too
     if (user) {

@@ -1,10 +1,15 @@
 // scripts/reset_test_redis.js
 // Clears OTP/cooldown Redis keys for test phone numbers before running newman
 
+require('dotenv').config();
 const { createClient } = require('redis');
 
 async function main() {
-  const client = createClient({ socket: { host: '127.0.0.1', port: 6379 } });
+  const redisConfig = process.env.REDIS_URL
+    ? { url: process.env.REDIS_URL }
+    : { socket: { host: process.env.REDIS_HOST || '127.0.0.1', port: parseInt(process.env.REDIS_PORT) || 6379 } };
+
+  const client = createClient(redisConfig);
   await client.connect();
 
   const phones   = ['9999999999', '8888888888', '7777777777'];

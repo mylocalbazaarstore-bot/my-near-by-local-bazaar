@@ -99,6 +99,13 @@ const getProfile = async (req, res) => {
   return success(res, { user });
 };
 
+// ── PATCH /profile ─────────────────────────────────────────────
+// Update name/email/gender/date_of_birth (all fields optional)
+const updateProfile = async (req, res) => {
+  const user = await CustomerAuthService.completeProfile(req.user.id, req.body);
+  return success(res, { user }, 'Profile updated successfully');
+};
+
 // ── POST /auth/customer/address ───────────────────────────────
 const addAddress = async (req, res) => {
   const userId = req.user.id;
@@ -218,6 +225,7 @@ module.exports = {
   verifyOTPHandler,
   completeProfile,
   getProfile,
+  updateProfile,
   addAddress,
   getAddresses,
   updateAddress,

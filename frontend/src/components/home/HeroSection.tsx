@@ -7,12 +7,13 @@
 // and pulsing live activity indicators
 // ─────────────────────────────────────────────────────────────
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Search, ArrowRight, Loader2, CheckCircle2, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
 import { apiGet } from '@/lib/api';
+import { useLocationStore } from '@/store/locationStore';
 import type { Area } from '@/types';
 
 // ── Floating stat pills ────────────────────────────────────────
@@ -37,15 +38,26 @@ function PincodeSearch() {
   const [results, setResults] = useState<Area[]>([]);
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
-  const [selected, setSelected] = useState<Area | null>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('mlb_selected_area');
-      return saved ? JSON.parse(saved) : null;
-    }
-    return null;
-  });
+  const location = useLocationStore();
 
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // ── One-time migration from the legacy raw localStorage key ──
+  useEffect(() => {
+    if (location.areaName) return;
+    const saved = localStorage.getItem('mlb_selected_area');
+    if (!saved) return;
+    try {
+      const area: Area = JSON.parse(saved);
+      location.setLocation({
+        areaId:   area.id,
+        areaName: area.name,
+        pincode:  area.pincode,
+        lat:      area.latitude,
+        lng:      area.longitude,
+      });
+    } catch { /* ignore malformed legacy value */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const search = useCallback(async (q: string) => {
     if (q.length < 2) { setResults([]); return; }
@@ -73,10 +85,17 @@ function PincodeSearch() {
   };
 
   const handleSelect = (area: Area) => {
-    setSelected(area);
+    location.setLocation({
+      areaId:   area.id,
+      areaName: area.name,
+      pincode:  area.pincode,
+      lat:      area.latitude,
+      lng:      area.longitude,
+    });
     setQuery('');
     setResults([]);
     setFocused(false);
+    // Back-compat: Header's LocationPill still reads this raw key
     localStorage.setItem('mlb_selected_area', JSON.stringify(area));
     router.push(`/explore?area=${area.id}&pincode=${area.pincode}`);
   };
@@ -101,15 +120,15 @@ function PincodeSearch() {
         {/* Location icon + selected area */}
         <div className="flex items-center gap-2 pl-2 flex-shrink-0">
           <MapPin className="w-5 h-5 text-brand-green" />
-          {selected && (
+          {location.areaName && (
             <div className="hidden sm:flex flex-col leading-none">
               <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider">Area</span>
               <span className="text-xs font-bold text-surface-800 truncate max-w-[100px]">
-                {selected.name}
+                {location.areaName}
               </span>
             </div>
           )}
-          {selected && (
+          {location.areaName && (
             <div className="hidden sm:block w-px h-8 bg-surface-200" />
           )}
         </div>
@@ -123,8 +142,8 @@ function PincodeSearch() {
           onFocus={() => setFocused(true)}
           onBlur={() => setTimeout(() => setFocused(false), 200)}
           onKeyDown={handleKeyDown}
-          placeholder={selected
-            ? `Search in ${selected.name}…`
+          placeholder={location.areaName
+            ? `Search in ${location.areaName}…`
             : 'Enter pincode or area (e.g. Kharghar, 410210)'}
           className="flex-1 bg-transparent text-base text-surface-900
                      placeholder-surface-400 focus:outline-none py-2 min-w-0"

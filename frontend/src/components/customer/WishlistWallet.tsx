@@ -9,15 +9,16 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, ShoppingCart, Trash2, Tag, Star, ExternalLink } from 'lucide-react';
+import { Heart, ShoppingCart, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useWishlist } from '@/hooks/useDashboard';
 import { EmptyState } from '@/components/ui/DashboardPrimitives';
-import { apiPost } from '@/lib/api';
+import { apiPost, getErrorMessage } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
+import type { WishlistProduct, WalletTransaction } from '@/types';
 
-function WishlistCard({ product, onRemove }: { product: any; onRemove: () => void }) {
+function WishlistCard({ product, onRemove }: { product: WishlistProduct; onRemove: () => void }) {
   const [adding, setAdding]   = useState(false);
   const { incrementCart }     = useAuthStore();
 
@@ -29,8 +30,8 @@ function WishlistCard({ product, onRemove }: { product: any; onRemove: () => voi
       await apiPost('/cart/items', { product_id: product.id, quantity: qty });
       incrementCart();
       toast.success(`${product.name} added to cart (min ${qty})`);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to add to cart');
+    } catch (err) {
+      toast.error(getErrorMessage(err));
     } finally {
       setAdding(false);
     }
@@ -92,14 +93,6 @@ function WishlistCard({ product, onRemove }: { product: any; onRemove: () => voi
             {product.name}
           </h3>
         </Link>
-
-        {/* Rating */}
-        {product.rating && (
-          <div className="flex items-center gap-1 mb-2">
-            <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-            <span className="text-xs font-semibold text-surface-700">{product.rating}</span>
-          </div>
-        )}
 
         {/* Price */}
         <div className="flex items-center gap-2 mb-3">
@@ -173,7 +166,7 @@ export function WishlistPanel() {
             layout
             className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"
           >
-            {wishlist.map((product: any) => (
+            {wishlist.map((product) => (
               <WishlistCard
                 key={product.id}
                 product={product}
@@ -199,8 +192,8 @@ import { Wallet, ArrowUpRight, ArrowDownLeft, Gift, Copy } from 'lucide-react';
 import { useAuthStore as useAuth } from '@/store/authStore';
 import dayjs from 'dayjs';
 
-function TransactionRow({ tx }: { tx: any }) {
-  const isCredit = tx.payment_status === 'refunded' || tx.amount > 0;
+function TransactionRow({ tx }: { tx: WalletTransaction }) {
+  const isCredit = tx.transaction_type === 'credit';
 
   return (
     <motion.div
@@ -220,10 +213,10 @@ function TransactionRow({ tx }: { tx: any }) {
 
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-surface-900 truncate">
-          {tx.order_number ? `Order ${tx.order_number}` : 'Wallet transaction'}
+          {tx.description || (isCredit ? 'Wallet credit' : 'Wallet debit')}
         </p>
         <p className="text-[11px] text-surface-400">
-          {dayjs(tx.created_at || new Date()).fromNow()} · {tx.payment_method || 'Wallet'}
+          {dayjs(tx.created_at).fromNow()}
         </p>
       </div>
 
@@ -233,9 +226,6 @@ function TransactionRow({ tx }: { tx: any }) {
           isCredit ? 'text-green-600' : 'text-red-500'
         )}>
           {isCredit ? '+' : '-'}₹{Number(tx.amount || 0).toFixed(2)}
-        </p>
-        <p className="text-[10px] text-surface-400 capitalize">
-          {tx.payment_status || 'completed'}
         </p>
       </div>
     </motion.div>
@@ -368,7 +358,7 @@ export function WalletPanel() {
             </div>
           ) : (
             <div>
-              {transactions.map((tx: any) => (
+              {transactions.map((tx) => (
                 <TransactionRow key={tx.id} tx={tx} />
               ))}
             </div>

@@ -5,9 +5,10 @@
 // PUBLIC — no auth required
 // ─────────────────────────────────────────────────────────────
 
-const express  = require('express');
-const router   = express.Router();
-const areaCtrl = require('../controllers/public/area.controller');
+const express     = require('express');
+const router      = express.Router();
+const areaCtrl    = require('../controllers/public/area.controller');
+const productCtrl = require('../controllers/public/product.controller');
 const { validate } = require('../middlewares/validate.middleware');
 const V        = require('../validators/product.validator');
 
@@ -45,5 +46,26 @@ merchantPubRouter.get(
   areaCtrl.getMerchantsByCoords
 );
 
-// Export both routers so index.js can mount them separately
-module.exports = { areaRouter: router, merchantPubRouter };
+// Merchant-scoped product listing (storefront) — registered BEFORE
+// the /:slug catch-all so "/:id/products" isn't shadowed by it.
+merchantPubRouter.get(
+  '/:id/products',
+  validate(V.merchantProducts, 'query'),
+  productCtrl.getMerchantProducts
+);
+
+// Single merchant storefront detail — catch-all (single segment),
+// MUST be registered LAST so it doesn't shadow /by-pincode, /by-coords etc.
+merchantPubRouter.get('/:slug', areaCtrl.getMerchantBySlug);
+
+// ─────────────────────────────────────────────────────────────
+// src/routes/product.public.routes.js
+// Public product detail route
+// Base: /api/v1/products
+// ─────────────────────────────────────────────────────────────
+const productPubRouter = express.Router();
+
+productPubRouter.get('/:id', productCtrl.getProductById);
+
+// Export all routers so index.js can mount them separately
+module.exports = { areaRouter: router, merchantPubRouter, productPubRouter };

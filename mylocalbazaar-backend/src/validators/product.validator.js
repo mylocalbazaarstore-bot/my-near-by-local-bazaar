@@ -181,14 +181,30 @@ const areaSearch = Joi.object({
 const merchantsByArea = Joi.object({
   pincode:       pincode.optional(),
   area_id:       uuid.optional(),
-  latitude:      Joi.number().min(-90).max(90).optional(),
-  longitude:     Joi.number().min(-180).max(180).optional(),
+  lat:           Joi.number().min(-90).max(90).optional(),
+  lng:           Joi.number().min(-180).max(180).optional(),
   radius_km:     Joi.number().min(0.1).max(50).default(5),
   store_category: Joi.string().valid(...STORE_CATEGORIES).optional(),
   is_open:       Joi.boolean().optional(),
   sort_by:       Joi.string().valid('distance','rating','name').default('distance'),
   page,
   limit,
+});
+
+// ═══════════════════════════════════════════════════════════════
+// MERCHANT STOREFRONT PRODUCT LIST (query params) — public
+// ═══════════════════════════════════════════════════════════════
+const merchantProducts = Joi.object({
+  page,
+  limit,
+  category_id:    uuid.optional(),
+  subcategory_id: uuid.optional(),
+  search:         Joi.string().max(200).trim().optional(),
+  min_price:      price.optional(),
+  max_price:      price.optional(),
+  in_stock:       Joi.boolean().optional(),
+  sort_by:        Joi.string().valid('created_at','retail_price','name','rating').default('created_at'),
+  sort_order:     Joi.string().valid('asc','desc').default('desc'),
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -238,6 +254,7 @@ module.exports = {
   updateVariant,
   areaSearch,
   merchantsByArea,
+  merchantProducts,
   categoryList,
   dashboardOverview,
   recentOrders,

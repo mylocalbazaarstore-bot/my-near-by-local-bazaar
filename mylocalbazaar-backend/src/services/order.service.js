@@ -375,7 +375,11 @@ const OrderService = {
       }
 
       // Verify Razorpay signature
-      const isValid = verifyPaymentSignature({ razorpay_order_id, razorpay_payment_id, razorpay_signature });
+      const isValid = verifyPaymentSignature({
+        razorpayOrderId:   razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+        razorpaySignature: razorpay_signature,
+      });
       if (!isValid) {
         throw Object.assign(new Error('Payment verification failed. Invalid signature.'), { statusCode: 400 });
       }

@@ -228,6 +228,10 @@ const AdminAnalyticsService = {
     }));
   },
 
+  // ── 3b. Alias used by /admin/analytics/top-merchants ─────
+  getTopMerchants: async (period = 'month', limitN = 10) =>
+    AdminAnalyticsService.getMerchantPerformance(period, limitN),
+
   // ── 4. Geographic expansion report ───────────────────────
   getGeographicReport: async () => {
     const cacheKey = 'mlb:admin_geo';

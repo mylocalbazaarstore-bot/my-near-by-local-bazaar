@@ -1,8 +1,8 @@
 // src/services/area.service.js
 // ─────────────────────────────────────────────────────────────
 // Area & Hyperlocal Discovery Service — MyLocalBazaar.store
-// Uses PostGIS ST_Distance + merchant_area_availability VIEW
-// for precise delivery zone matching
+// Uses PostGIS ST_Distance/ST_DWithin (geography columns) +
+// merchant_area_availability VIEW for delivery zone matching
 // ─────────────────────────────────────────────────────────────
 
 const { query, queryPaginated } = require('../config/db');
@@ -78,23 +78,15 @@ const AreaService = {
     const { rows } = await query(
       `SELECT a.id, a.name, a.pincode, a.latitude, a.longitude,
               c.name AS city_name, c.state,
-              ROUND(
-                (ST_Distance(
-                  a.geom::geography,
-                  ST_MakePoint($2, $1)::geography
-                ) / 1000)::numeric, 2
-              ) AS distance_km
+              ROUND((ST_Distance(a.geom, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography) / 1000)::numeric, 2) AS distance_km
        FROM areas a
        JOIN cities c ON c.id = a.city_id
        WHERE a.is_active = true
-         AND ST_DWithin(
-           a.geom::geography,
-           ST_MakePoint($2, $1)::geography,
-           $3
-         )
+         AND a.geom IS NOT NULL
+         AND ST_DWithin(a.geom, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography, $3::float8 * 1000)
        ORDER BY distance_km ASC
        LIMIT 20`,
-      [lat, lng, radiusKm * 1000] // ST_DWithin takes meters
+      [lat, lng, radiusKm]
     );
 
     await redis.set(cacheKey, rows, CACHE_TTL);
@@ -181,13 +173,17 @@ const MerchantDiscoveryService = {
     );
   },
 
-  // ── Merchants within radius of lat/lng (direct PostGIS) ──────
+  // ── Merchants within radius of lat/lng (PostGIS radius) ──────
   getByCoords: async (lat, lng, radiusKm = 5, filters = {}, pagination = {}) => {
     const { store_category, is_open, sort_by = 'distance' } = filters;
     const { page = 1, limit = 20 } = pagination;
 
-    const params  = [lat, lng, radiusKm * 1000];
-    const clauses = ['m.merchant_status = $4', "m.is_active = true"];
+    const params  = [lat, lng, radiusKm];
+    const clauses = [
+      'm.merchant_status = $4', 'm.is_active = true',
+      'm.geom IS NOT NULL',
+      'ST_DWithin(m.geom, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography, $3::float8 * 1000)',
+    ];
     params.push('active'); // $4
 
     if (store_category) {
@@ -201,28 +197,28 @@ const MerchantDiscoveryService = {
 
     const sortMap = {
       distance: 'distance_km ASC',
-      rating:   'm.rating DESC',
-      name:     'm.store_name ASC',
+      rating:   'rating DESC',
+      name:     'store_name ASC',
     };
 
     return queryPaginated(
-      `SELECT
-         m.id, m.store_name, m.store_slug, m.store_category,
-         m.store_logo_url, m.store_banner_url,
-         m.delivery_radius_km, m.min_order_value, m.is_open,
-         m.rating, m.total_reviews, m.is_featured,
-         m.accepts_cod, m.emergency_booking, m.pincode,
-         ROUND(
-           (ST_Distance(m.geom::geography, ST_MakePoint($2,$1)::geography) / 1000)::numeric, 2
-         ) AS distance_km
-       FROM merchants m
-       WHERE ${clauses.join(' AND ')}
-         AND ST_DWithin(
-           m.geom::geography,
-           ST_MakePoint($2, $1)::geography,
-           $3
-         )
-       ORDER BY m.is_featured DESC, ${sortMap[sort_by] || 'distance_km ASC'}`,
+      `SELECT id, store_name, store_slug, store_category,
+              store_logo_url, store_banner_url,
+              delivery_radius_km, min_order_value, is_open,
+              rating, total_reviews, is_featured,
+              accepts_cod, emergency_booking, pincode,
+              ROUND(distance_km::numeric, 2) AS distance_km
+       FROM (
+         SELECT m.id, m.store_name, m.store_slug, m.store_category,
+                m.store_logo_url, m.store_banner_url,
+                m.delivery_radius_km, m.min_order_value, m.is_open,
+                m.rating, m.total_reviews, m.is_featured,
+                m.accepts_cod, m.emergency_booking, m.pincode,
+                ST_Distance(m.geom, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography) / 1000 AS distance_km
+         FROM merchants m
+         WHERE ${clauses.join(' AND ')}
+       ) sub
+       ORDER BY is_featured DESC, ${sortMap[sort_by] || 'distance_km ASC'}`,
       params,
       { page, limit }
     );

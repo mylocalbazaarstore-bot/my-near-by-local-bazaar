@@ -48,9 +48,10 @@ router.use('/auth', require('./auth.routes'));
 router.use('/categories', require('./category.routes'));
 
 // Goal 1.4 — Area & Merchant Discovery (Public, PostGIS-powered)
-const { areaRouter, merchantPubRouter } = require('./area.routes');
+const { areaRouter, merchantPubRouter, productPubRouter } = require('./area.routes');
 router.use('/areas',     areaRouter);
 router.use('/merchants', merchantPubRouter);
+router.use('/products',  productPubRouter);
 
 // Goal 1.4 — Merchant Product Management
 router.use('/merchant/products',  require('./product.routes'));
@@ -60,6 +61,10 @@ router.use('/merchant/dashboard', require('./merchant.dashboard.routes'));
 
 // Goal 1.5 — Customer Cart
 router.use('/cart', require('./cart.routes'));
+
+// Goal 1.8 — Customer Profile & Wishlist (Dashboard)
+router.use('/profile',  require('./profile.routes'));
+router.use('/wishlist', require('./wishlist.routes'));
 
 // Goal 1.5 — Orders (Customer + Merchant Double-Approval Flow)
 const { customerOrderRouter, merchantOrderRouter } = require('./order.routes');

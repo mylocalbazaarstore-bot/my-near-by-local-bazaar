@@ -6,7 +6,9 @@
 // ─────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback } from 'react';
-import { apiGet, apiPost, apiPatch } from '@/lib/api';
+import { apiGet, apiPatch, apiDelete, getErrorMessage } from '@/lib/api';
+import toast from 'react-hot-toast';
+import type { Wallet, WalletTransaction, CustomerProfile, WishlistProduct } from '@/types';
 
 // ── Generic async hook factory ────────────────────────────────
 function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []) {
@@ -52,33 +54,39 @@ export function useOrderDetail(orderId: string) {
 }
 
 export function useWishlist() {
-  const [wishlist, setWishlist] = useState<any[]>([]);
+  const [wishlist, setWishlist] = useState<WishlistProduct[]>([]);
   const [loading,  setLoading]  = useState(true);
 
-  const fetch = async () => {
+  const fetchWishlist = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiGet<any>('/users/wishlist');
-      setWishlist((res.data as any)?.products || []);
-    } catch { setWishlist([]); }
-    finally { setLoading(false); }
-  };
+      const res = await apiGet<{ products: WishlistProduct[] }>('/wishlist');
+      setWishlist(res.data?.products || []);
+    } catch {
+      setWishlist([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  useEffect(() => { fetch(); }, []);
+  useEffect(() => { fetchWishlist(); }, [fetchWishlist]);
 
   const removeFromWishlist = async (productId: string) => {
     try {
-      await apiPost(`/users/wishlist/${productId}/remove`);
+      await apiDelete(`/wishlist/${productId}`);
       setWishlist((prev) => prev.filter((p) => p.id !== productId));
-    } catch {}
+      toast.success('Removed from wishlist');
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
   };
 
-  return { wishlist, loading, refetch: fetch, removeFromWishlist };
+  return { wishlist, loading, refetch: fetchWishlist, removeFromWishlist };
 }
 
 export function useWalletData() {
-  const [wallet,       setWallet]       = useState<any>(null);
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [wallet,       setWallet]       = useState<Wallet | null>(null);
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [loading,      setLoading]      = useState(true);
 
   useEffect(() => {
@@ -86,16 +94,51 @@ export function useWalletData() {
       setLoading(true);
       try {
         const [walletRes, txRes] = await Promise.allSettled([
-          apiGet<any>('/users/wallet'),
-          apiGet<any>('/payments/history?limit=20'),
+          apiGet<{ wallet: Wallet }>('/wallet'),
+          apiGet<WalletTransaction[]>('/wallet/transactions?limit=20'),
         ]);
-        if (walletRes.status === 'fulfilled') setWallet((walletRes.value.data as any)?.wallet);
-        if (txRes.status === 'fulfilled')     setTransactions((txRes.value.data as any)?.payments || []);
+        if (walletRes.status === 'fulfilled') setWallet(walletRes.value.data?.wallet ?? null);
+        if (txRes.status === 'fulfilled')     setTransactions(txRes.value.data || []);
       } finally { setLoading(false); }
     })();
   }, []);
 
   return { wallet, transactions, loading };
+}
+
+// ── Customer Profile ────────────────────────────────────────────
+interface ProfileUpdatePayload {
+  full_name?:     string;
+  email?:         string;
+  gender?:        string;
+  date_of_birth?: string;
+}
+
+export function useProfile() {
+  const [profile, setProfile] = useState<CustomerProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchProfile = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiGet<{ user: CustomerProfile }>('/profile');
+      setProfile(res.data?.user ?? null);
+    } catch {
+      setProfile(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchProfile(); }, [fetchProfile]);
+
+  const updateProfile = async (payload: ProfileUpdatePayload) => {
+    const res = await apiPatch<{ user: CustomerProfile }>('/profile', payload);
+    setProfile(res.data?.user ?? null);
+    return res;
+  };
+
+  return { profile, loading, refetch: fetchProfile, updateProfile };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -138,7 +181,7 @@ export function useMerchantProducts(params: Record<string, string | number> = {}
   useEffect(() => { fetch(); }, [fetch]);
 
   const archiveProduct = async (id: string) => {
-    await apiPatch(`/merchant/products/${id}`, { product_status: 'archived' });
+    await apiDelete(`/merchant/products/${id}`);
     fetch();
   };
 

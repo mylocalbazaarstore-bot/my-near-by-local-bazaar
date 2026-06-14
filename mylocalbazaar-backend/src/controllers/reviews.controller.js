@@ -204,7 +204,12 @@ const walletController = {
       "SELECT id FROM wallets WHERE owner_id = $1 AND owner_type = 'customer'",
       [req.user.id]
     );
-    if (!walletRows[0]) return success(res, { transactions: [], meta: {} });
+    if (!walletRows[0]) {
+      return paginated(res, {
+        rows: [], total: 0, page: Number(page), limit: Number(limit),
+        totalPages: 0, hasNext: false, hasPrev: false,
+      }, 'Wallet transactions');
+    }
 
     const result = await queryPaginated(
       `SELECT id, transaction_type, amount, closing_balance,

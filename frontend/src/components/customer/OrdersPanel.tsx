@@ -389,8 +389,8 @@ export default function OrdersPanel() {
   if (activeTab) params.status = activeTab;
 
   const { data, loading } = useCustomerOrders(params);
-  const orders = (data?.data as any)?.rows || [];
-  const meta   = (data?.data as any)?.meta || {};
+  const orders = (data?.data as any[]) || [];
+  const meta   = (data as any)?.meta || {};
 
   const filtered = search
     ? orders.filter((o: any) =>

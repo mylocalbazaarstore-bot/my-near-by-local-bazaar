@@ -80,6 +80,15 @@ const customerCompleteProfile = Joi.object({
   referral_code: Joi.string().trim().uppercase().optional(),
 });
 
+// Customer updates their profile (all fields optional — PATCH /profile)
+const customerUpdateProfile = Joi.object({
+  full_name: Joi.string().min(2).max(200).trim().optional(),
+  email: Joi.string().email().lowercase().trim().optional(),
+  gender: Joi.string().valid('male', 'female', 'other', 'prefer_not_to_say').optional(),
+  date_of_birth: Joi.date().max('now').optional()
+    .messages({ 'date.max': 'Date of birth cannot be in the future' }),
+});
+
 // Customer adds a delivery address
 const customerAddAddress = Joi.object({
   label:         Joi.string().valid('Home', 'Work', 'Other').default('Home'),
@@ -262,6 +271,7 @@ module.exports = {
   customerSendOTP,
   customerVerifyOTP,
   customerCompleteProfile,
+  customerUpdateProfile,
   customerAddAddress,
   // Merchant
   merchantSendOTP,

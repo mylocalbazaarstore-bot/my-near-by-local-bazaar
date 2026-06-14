@@ -89,6 +89,8 @@ const STATUS_STYLES: Record<string, string> = {
   delivered:          'bg-green-100 text-green-700',
   cancelled:          'bg-red-100 text-red-600',
   return_requested:   'bg-orange-100 text-orange-700',
+  return_approved:    'bg-green-100 text-green-700',
+  return_rejected:    'bg-red-100 text-red-700',
   refund_initiated:   'bg-pink-100 text-pink-700',
   refund_completed:   'bg-green-100 text-green-700',
   // Product statuses
@@ -98,10 +100,14 @@ const STATUS_STYLES: Record<string, string> = {
   out_of_stock:       'bg-orange-100 text-orange-700',
   archived:           'bg-surface-100 text-surface-500',
   draft:              'bg-surface-100 text-surface-500',
+  // Merchant / account statuses
+  suspended:          'bg-orange-100 text-orange-700',
+  disabled:           'bg-surface-200 text-surface-600',
   // KYC
   verified:           'bg-green-100 text-green-700',
   submitted:          'bg-blue-100 text-blue-700',
   pending:            'bg-yellow-100 text-yellow-700',
+  not_submitted:      'bg-surface-100 text-surface-500',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -115,6 +121,8 @@ const STATUS_LABELS: Record<string, string> = {
   delivered:         'Delivered ✓',
   cancelled:         'Cancelled',
   return_requested:  'Return Requested',
+  return_approved:   'Return Approved',
+  return_rejected:   'Return Rejected',
   refund_initiated:  'Refund Processing',
   refund_completed:  'Refunded',
   active:            'Active',
@@ -123,9 +131,12 @@ const STATUS_LABELS: Record<string, string> = {
   out_of_stock:      'Out of Stock',
   archived:          'Archived',
   draft:             'Draft',
+  suspended:         'Suspended',
+  disabled:          'Disabled',
   pending:           'Pending',
   verified:          'Verified',
-  submitted:         'Submitted',
+  submitted:         'Pending Review',
+  not_submitted:     'Not Submitted',
 };
 
 export function StatusBadge({ status }: { status: string }) {

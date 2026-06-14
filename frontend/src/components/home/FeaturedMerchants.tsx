@@ -17,21 +17,9 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { apiGet } from '@/lib/api';
+import { useLocationStore } from '@/store/locationStore';
+import { CAT_BADGES, getBrandColor, getBrandAccent } from '@/lib/storeTheme';
 import type { Merchant } from '@/types';
-
-// ── Category badge colors ──────────────────────────────────────
-const CAT_BADGES: Record<string, { label: string; class: string }> = {
-  grocery_fmcg:      { label: 'Grocery',      class: 'bg-green-100 text-green-700' },
-  wholesale:         { label: 'Wholesale',     class: 'bg-orange-100 text-orange-700' },
-  electronics:       { label: 'Electronics',  class: 'bg-blue-100 text-blue-700' },
-  hardware:          { label: 'Hardware',      class: 'bg-stone-100 text-stone-700' },
-  clothing:          { label: 'Fashion',       class: 'bg-pink-100 text-pink-700' },
-  medical:           { label: 'Medical',       class: 'bg-red-100 text-red-700' },
-  service:           { label: 'Service',       class: 'bg-cyan-100 text-cyan-700' },
-  food_tea_stall:    { label: 'Food',          class: 'bg-orange-100 text-orange-700' },
-  food_chaat_chinese:{ label: 'Street Food',   class: 'bg-red-100 text-red-700' },
-  specialty:         { label: 'Specialty',     class: 'bg-purple-100 text-purple-700' },
-};
 
 // ── Merchant Card ──────────────────────────────────────────────
 function MerchantCard({ merchant, index }: { merchant: Merchant; index: number }) {
@@ -195,24 +183,24 @@ function MerchantCardSkeleton() {
   );
 }
 
-// ── Color helpers ──────────────────────────────────────────────
-function getBrandColor(cat: string): string {
-  const map: Record<string, string> = {
-    grocery_fmcg: '#22C55E', wholesale: '#F97316', electronics: '#3B82F6',
-    hardware: '#78716C', clothing: '#EC4899', medical: '#EF4444',
-    service: '#06B6D4', food_tea_stall: '#F97316', food_chaat_chinese: '#DC2626',
-    specialty: '#8B5CF6',
-  };
-  return map[cat] || '#6B7280';
-}
-function getBrandAccent(cat: string): string {
-  const map: Record<string, string> = {
-    grocery_fmcg: '#F97316', wholesale: '#EA580C', electronics: '#1D4ED8',
-    hardware: '#57534E', clothing: '#DB2777', medical: '#3B82F6',
-    service: '#0284C7', food_tea_stall: '#DC2626', food_chaat_chinese: '#F97316',
-    specialty: '#6D28D9',
-  };
-  return map[cat] || '#374151';
+// ── "Set your location" CTA (shown when no location is set) ────
+function LocationCTA() {
+  return (
+    <div className="card flex flex-col items-center justify-center text-center gap-3 py-10 px-6">
+      <div className="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center">
+        <MapPin className="w-6 h-6 text-brand-green" />
+      </div>
+      <div>
+        <p className="font-bold text-surface-900 mb-1">Set your location</p>
+        <p className="text-sm text-surface-500 max-w-xs">
+          Tell us where you are to discover the stores closest to you
+        </p>
+      </div>
+      <Link href="/set-location" className="btn-primary text-sm !px-5 !py-2.5">
+        Set Location
+      </Link>
+    </div>
+  );
 }
 
 // ── Scroll row with arrows ─────────────────────────────────────
@@ -271,6 +259,10 @@ function ScrollRow({ merchants, loading }: { merchants: Merchant[]; loading: boo
 // FEATURED MERCHANTS SECTION
 // ═══════════════════════════════════════════════════════════════
 export default function FeaturedMerchants() {
+  const { lat, lng, pincode } = useLocationStore();
+  const hasCoords   = lat !== null && lng !== null;
+  const hasLocation = hasCoords || !!pincode;
+
   const [featured, setFeatured] = useState<Merchant[]>([]);
   const [nearby,   setNearby]   = useState<Merchant[]>([]);
   const [loading,  setLoading]  = useState(true);
@@ -278,23 +270,33 @@ export default function FeaturedMerchants() {
   const inView     = useInView(sectionRef, { once: true, margin: '-80px' });
 
   useEffect(() => {
-    const pincode = JSON.parse(localStorage.getItem('mlb_selected_area') || '{}').pincode || '410210';
-
     (async () => {
       setLoading(true);
       try {
-        const [featRes, nearbyRes] = await Promise.allSettled([
-          apiGet<{ data: Merchant[] }>(`/merchants/by-pincode/${pincode}?sort_by=rating&limit=8`),
-          apiGet<{ data: Merchant[] }>(`/merchants/by-pincode/${pincode}?sort_by=distance&limit=8`),
-        ]);
+        // Featured: location-aware if coords are set, else fall back to
+        // a city-level default pincode (graceful degradation per design spec)
+        const featuredUrl = hasCoords
+          ? `/merchants/by-coords?lat=${lat}&lng=${lng}&radius_km=5&sort_by=rating&limit=8`
+          : `/merchants/by-pincode/${pincode || '410210'}?sort_by=rating&limit=8`;
 
-        if (featRes.status === 'fulfilled') {
-          const rows = (featRes.value.data as any)?.rows || [];
-          setFeatured(rows);
+        const requests: Promise<{ data: Merchant[] }>[] = [apiGet<Merchant[]>(featuredUrl)];
+
+        // Nearby: only fetch if the user has actually shared a location
+        if (hasCoords) {
+          requests.push(apiGet<Merchant[]>(`/merchants/by-coords?lat=${lat}&lng=${lng}&radius_km=5&sort_by=distance&limit=8`));
+        } else if (pincode) {
+          requests.push(apiGet<Merchant[]>(`/merchants/by-pincode/${pincode}?sort_by=distance&limit=8`));
         }
-        if (nearbyRes.status === 'fulfilled') {
-          const rows = (nearbyRes.value.data as any)?.rows || [];
-          setNearby(rows);
+
+        const results = await Promise.allSettled(requests);
+
+        if (results[0].status === 'fulfilled') {
+          setFeatured(results[0].value.data || []);
+        }
+        if (results[1]?.status === 'fulfilled') {
+          setNearby(results[1].value.data || []);
+        } else {
+          setNearby([]);
         }
       } catch {
         // In dev/demo mode show skeleton
@@ -302,7 +304,7 @@ export default function FeaturedMerchants() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [hasCoords, lat, lng, pincode]);
 
   // Use mock data if API not yet connected
   const displayFeatured = featured.length ? featured : MOCK_MERCHANTS;
@@ -374,7 +376,11 @@ export default function FeaturedMerchants() {
               View all <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
-          <ScrollRow merchants={displayNearby} loading={loading} />
+          {hasLocation ? (
+            <ScrollRow merchants={displayNearby} loading={loading} />
+          ) : (
+            <LocationCTA />
+          )}
         </div>
       </div>
     </section>
