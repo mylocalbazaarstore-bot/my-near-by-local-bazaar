@@ -14,9 +14,14 @@ const OTP_EXPIRY   = parseInt(process.env.OTP_EXPIRY_MINUTES  || 5)  * 60;
 const MAX_ATTEMPTS = parseInt(process.env.OTP_MAX_ATTEMPTS     || 3);
 const COOLDOWN     = parseInt(process.env.OTP_RESEND_COOLDOWN_SECONDS || 60);
 
+const isOtpDevMode = () => (
+  process.env.OTP_DEV_MODE === 'true' ||
+  process.env.OTP_USE_FIXED_DEV === 'true'
+);
+
 // Generate a secure 6-digit OTP
 const generateOTP = () => {
-  if (process.env.OTP_USE_FIXED_DEV === 'true' && process.env.NODE_ENV !== 'production') {
+  if (isOtpDevMode()) {
     return process.env.OTP_FIXED_DEV_CODE || '123456';
   }
   return String(crypto.randomInt(100000, 999999));
@@ -67,7 +72,7 @@ const checkCooldown = async (phone, purpose = 'login') => {
 
 // Send OTP via Fast2SMS (India)
 const sendSMSOTP = async (phone, otp) => {
-  if (process.env.OTP_USE_FIXED_DEV === 'true' && process.env.NODE_ENV !== 'production') {
+  if (isOtpDevMode()) {
     logger.info(`[DEV] OTP for ${phone}: ${otp}`);
     return { sent: true, provider: 'dev' };
   }
@@ -135,16 +140,26 @@ const sendOTP = async (phone, purpose = 'login') => {
   const otp = generateOTP();
   await storeOTP(phone, otp, purpose);
 
-  const [smsResult] = await Promise.allSettled([
+  const [smsResult, whatsAppResult] = await Promise.allSettled([
     sendSMSOTP(phone, otp),
     sendWhatsAppOTP(phone, otp),  // best-effort
   ]);
 
   if (smsResult.status === 'rejected') {
-    throw new Error('Failed to deliver OTP');
+    logger.warn('OTP stored but SMS delivery failed:', { phone, purpose, message: smsResult.reason.message });
   }
 
-  return { sent: true };
+  if (whatsAppResult.status === 'rejected') {
+    logger.warn('OTP stored but WhatsApp delivery failed:', { phone, purpose, message: whatsAppResult.reason.message });
+  }
+
+  return {
+    sent: true,
+    delivery: {
+      sms: smsResult.status === 'fulfilled' ? smsResult.value : { sent: false },
+      whatsapp: whatsAppResult.status === 'fulfilled' ? whatsAppResult.value : { sent: false },
+    },
+  };
 };
 
 module.exports = { generateOTP, storeOTP, verifyOTP, checkCooldown, sendOTP };
