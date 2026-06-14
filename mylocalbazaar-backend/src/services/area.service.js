@@ -12,6 +12,31 @@ const logger                    = require('../config/logger');
 const CACHE_TTL = 300; // 5 minutes for area data
 
 // ═══════════════════════════════════════════════════════════════
+// POSTGIS AVAILABILITY (Railway's managed Postgres ships without
+// PostGIS, so geom columns may not exist — fall back to Haversine)
+// ═══════════════════════════════════════════════════════════════
+
+let _hasGeomCache = null;
+
+async function hasGeomColumns() {
+  if (_hasGeomCache !== null) return _hasGeomCache;
+  const result = await query(`
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name = 'merchants' AND column_name = 'geom'
+    ) AS has_geom
+  `);
+  _hasGeomCache = result.rows[0].has_geom;
+  return _hasGeomCache;
+}
+
+// Great-circle distance (km) between (latParam, lngParam) and a row's
+// lat/lng columns — used when PostGIS geography columns aren't available.
+const haversineKm = (latParam, lngParam, latCol, lngCol) =>
+  `(6371 * acos(LEAST(1.0, cos(radians(${latParam})) * cos(radians(${latCol})) * ` +
+  `cos(radians(${lngCol}) - radians(${lngParam})) + sin(radians(${latParam})) * sin(radians(${latCol})))))`;
+
+// ═══════════════════════════════════════════════════════════════
 // AREA DISCOVERY
 // ═══════════════════════════════════════════════════════════════
 
@@ -69,25 +94,43 @@ const AreaService = {
     );
   },
 
-  // ── Find nearby areas by lat/lng (PostGIS radius) ─────────────
+  // ── Find nearby areas by lat/lng (PostGIS radius, Haversine fallback) ─
   getNearby: async (lat, lng, radiusKm = 5) => {
     const cacheKey = `mlb:nearby:${lat.toFixed(3)}:${lng.toFixed(3)}:${radiusKm}`;
     const cached = await redis.get(cacheKey);
     if (cached) return cached;
 
-    const { rows } = await query(
-      `SELECT a.id, a.name, a.pincode, a.latitude, a.longitude,
-              c.name AS city_name, c.state,
-              ROUND((ST_Distance(a.geom, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography) / 1000)::numeric, 2) AS distance_km
-       FROM areas a
-       JOIN cities c ON c.id = a.city_id
-       WHERE a.is_active = true
-         AND a.geom IS NOT NULL
-         AND ST_DWithin(a.geom, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography, $3::float8 * 1000)
-       ORDER BY distance_km ASC
-       LIMIT 20`,
-      [lat, lng, radiusKm]
-    );
+    let rows;
+    if (await hasGeomColumns()) {
+      ({ rows } = await query(
+        `SELECT a.id, a.name, a.pincode, a.latitude, a.longitude,
+                c.name AS city_name, c.state,
+                ROUND((ST_Distance(a.geom, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography) / 1000)::numeric, 2) AS distance_km
+         FROM areas a
+         JOIN cities c ON c.id = a.city_id
+         WHERE a.is_active = true
+           AND a.geom IS NOT NULL
+           AND ST_DWithin(a.geom, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography, $3::float8 * 1000)
+         ORDER BY distance_km ASC
+         LIMIT 20`,
+        [lat, lng, radiusKm]
+      ));
+    } else {
+      const distanceExpr = haversineKm('$1', '$2', 'a.latitude', 'a.longitude');
+      ({ rows } = await query(
+        `SELECT a.id, a.name, a.pincode, a.latitude, a.longitude,
+                c.name AS city_name, c.state,
+                ROUND(${distanceExpr}::numeric, 2) AS distance_km
+         FROM areas a
+         JOIN cities c ON c.id = a.city_id
+         WHERE a.is_active = true
+           AND a.latitude IS NOT NULL AND a.longitude IS NOT NULL
+           AND ${distanceExpr} <= $3::float8
+         ORDER BY distance_km ASC
+         LIMIT 20`,
+        [lat, lng, radiusKm]
+      ));
+    }
 
     await redis.set(cacheKey, rows, CACHE_TTL);
     return rows;
@@ -173,17 +216,25 @@ const MerchantDiscoveryService = {
     );
   },
 
-  // ── Merchants within radius of lat/lng (PostGIS radius) ──────
+  // ── Merchants within radius of lat/lng (PostGIS radius, Haversine fallback) ─
   getByCoords: async (lat, lng, radiusKm = 5, filters = {}, pagination = {}) => {
     const { store_category, is_open, sort_by = 'distance' } = filters;
     const { page = 1, limit = 20 } = pagination;
 
     const params  = [lat, lng, radiusKm];
-    const clauses = [
-      'm.merchant_status = $4', 'm.is_active = true',
-      'm.geom IS NOT NULL',
-      'ST_DWithin(m.geom, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography, $3::float8 * 1000)',
-    ];
+    const useGeom = await hasGeomColumns();
+
+    const clauses = useGeom
+      ? [
+          'm.merchant_status = $4', 'm.is_active = true',
+          'm.geom IS NOT NULL',
+          'ST_DWithin(m.geom, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography, $3::float8 * 1000)',
+        ]
+      : [
+          'm.merchant_status = $4', 'm.is_active = true',
+          'm.latitude IS NOT NULL', 'm.longitude IS NOT NULL',
+          `${haversineKm('$1', '$2', 'm.latitude', 'm.longitude')} <= $3::float8`,
+        ];
     params.push('active'); // $4
 
     if (store_category) {
@@ -201,6 +252,10 @@ const MerchantDiscoveryService = {
       name:     'store_name ASC',
     };
 
+    const distanceExpr = useGeom
+      ? 'ST_Distance(m.geom, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography) / 1000'
+      : haversineKm('$1', '$2', 'm.latitude', 'm.longitude');
+
     return queryPaginated(
       `SELECT id, store_name, store_slug, store_category,
               store_logo_url, store_banner_url,
@@ -214,7 +269,7 @@ const MerchantDiscoveryService = {
                 m.delivery_radius_km, m.min_order_value, m.is_open,
                 m.rating, m.total_reviews, m.is_featured,
                 m.accepts_cod, m.emergency_booking, m.pincode,
-                ST_Distance(m.geom, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography) / 1000 AS distance_km
+                ${distanceExpr} AS distance_km
          FROM merchants m
          WHERE ${clauses.join(' AND ')}
        ) sub
