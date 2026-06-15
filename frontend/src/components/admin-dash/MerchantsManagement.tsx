@@ -327,7 +327,7 @@ export default function MerchantsManagement() {
                   {/* Wallet */}
                   <div className="card p-4">
                     <h4 className="text-xs font-bold text-surface-500 uppercase tracking-wider mb-3">Wallet</h4>
-                    <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-center">
                       <div>
                         <p className="font-display text-lg font-bold text-brand-green">₹{Number(detail.wallet_balance || 0).toFixed(0)}</p>
                         <p className="text-[11px] text-surface-500">Balance</p>

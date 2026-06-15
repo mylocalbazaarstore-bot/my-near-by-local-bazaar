@@ -444,14 +444,14 @@ export default function AnalyticsDashboard() {
       {overview?.wallet && (
         <div className="card p-5">
           <h3 className="font-bold text-surface-900 mb-3">Wallet Snapshot</h3>
-          <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-center">
             {[
               { label: 'Available Balance', value: `₹${Number(overview.wallet.balance || 0).toFixed(2)}`, color: 'text-brand-green' },
               { label: 'Locked (Pending)', value: `₹${Number(overview.wallet.locked_balance || 0).toFixed(2)}`, color: 'text-brand-orange' },
               { label: 'Total Earned',     value: `₹${Number(overview.wallet.total_credited || 0).toFixed(2)}`, color: 'text-blue-500' },
             ].map(({ label, value, color }) => (
               <div key={label}>
-                <p className={clsx('font-display text-2xl font-bold', color)}>{value}</p>
+                <p className={clsx('font-display text-xl sm:text-2xl font-bold', color)}>{value}</p>
                 <p className="text-xs text-surface-500 mt-0.5">{label}</p>
               </div>
             ))}

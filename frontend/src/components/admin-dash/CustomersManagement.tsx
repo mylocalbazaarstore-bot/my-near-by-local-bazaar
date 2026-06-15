@@ -347,7 +347,7 @@ export default function CustomersManagement() {
                         <Wallet className="w-3.5 h-3.5" /> Adjust
                       </button>
                     </div>
-                    <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-center">
                       <div>
                         <p className="font-display text-lg font-bold text-brand-green">
                           ₹{Number(detail.wallet_balance_live ?? detail.wallet_balance ?? 0).toFixed(0)}
