@@ -199,7 +199,7 @@ function OTPStep({
         </p>
       )}
 
-      <div className="flex gap-3 justify-center mb-5" onPaste={handlePaste}>
+      <div className="flex gap-2 sm:gap-3 justify-center mb-5" onPaste={handlePaste}>
         {otp.map((digit, i) => (
           <input key={i}
             ref={(el) => { refs.current[i] = el; }}
@@ -208,7 +208,7 @@ function OTPStep({
             onKeyDown={(e) => handleKey(i, e)}
             disabled={loading} autoFocus={i === 0}
             className={clsx(
-              'w-12 h-14 text-center text-2xl font-black border-2 rounded-xl focus:outline-none transition-all',
+              'w-9 h-11 sm:w-12 sm:h-14 text-lg sm:text-2xl text-center font-black border-2 rounded-xl focus:outline-none transition-all',
               digit ? 'border-red-500 bg-red-50 text-red-600' : 'border-surface-200 bg-white',
               'focus:border-red-500 focus:bg-red-50',
               loading && 'opacity-60 cursor-not-allowed'

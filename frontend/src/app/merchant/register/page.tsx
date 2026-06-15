@@ -288,7 +288,7 @@ function Step1Phone({ data, update, onNext }: { data: RegisterFormData; update: 
       <h2 className="font-display text-2xl font-bold text-surface-900 mb-1">Enter OTP</h2>
       <p className="text-surface-500 text-sm mb-7">Sent to <strong className="text-surface-900">+91 {phone}</strong></p>
 
-      <div className="flex gap-3 justify-center mb-5" onPaste={handlePaste}>
+      <div className="flex gap-2 sm:gap-3 justify-center mb-5" onPaste={handlePaste}>
         {otp.map((digit, i) => (
           <input key={i} ref={(el) => { refs.current[i] = el; }}
             type="text" inputMode="numeric" maxLength={1} value={digit}
@@ -296,7 +296,7 @@ function Step1Phone({ data, update, onNext }: { data: RegisterFormData; update: 
             onKeyDown={(e) => handleKey(i, e)}
             disabled={loading} autoFocus={i === 0}
             className={clsx(
-              'w-12 h-14 text-center text-2xl font-black border-2 rounded-xl focus:outline-none transition-all',
+              'w-9 h-11 sm:w-12 sm:h-14 text-lg sm:text-2xl text-center font-black border-2 rounded-xl focus:outline-none transition-all',
               digit ? 'border-[#1E3A8A] bg-blue-50 text-[#1E3A8A]' : 'border-surface-200 bg-white',
               'focus:border-[#1E3A8A] focus:bg-blue-50',
               loading && 'opacity-60 cursor-not-allowed'

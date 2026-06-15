@@ -450,7 +450,7 @@ export default function Header() {
       </header>
 
       {/* Spacer for fixed header */}
-      <div className="h-[var(--header-h)]" style={{ height: 'calc(72px + 32px)' }} />
+      <div className="h-[144px] sm:h-[104px]" />
 
       {/* Mobile drawer */}
       <MobileDrawer open={mobileOpen} onClose={() => setMobile(false)} />
