@@ -16,6 +16,31 @@ const razorpay = new Razorpay({
   key_secret: isProduction ? process.env.RAZORPAY_KEY_SECRET : process.env.RAZORPAY_TEST_KEY_SECRET,
 });
 
+// ── Normalise Razorpay SDK errors ─────────────────────────────
+// The Razorpay SDK v2 throws a plain object { statusCode, error }
+// (not an Error instance), so err.message is always undefined and
+// the global error handler falls back to "Internal server error"
+// while leaking the upstream 401 status to the client.
+// This wrapper converts every Razorpay error into a proper Error
+// with a meaningful message and a safe HTTP status code.
+function normaliseRazorpayError(err, context) {
+  const rzpCode  = err?.error?.code        || 'RAZORPAY_ERROR';
+  const rzpDesc  = err?.error?.description || err?.message || 'Payment gateway error';
+  const httpCode = err?.statusCode;
+
+  logger.error(`Razorpay ${context} failed`, { rzpCode, description: rzpDesc, httpCode });
+
+  const isAuthFailure = httpCode === 401 || httpCode === 403;
+  const outErr = new Error(
+    isAuthFailure
+      ? 'Payment gateway is not configured. Please contact support.'
+      : `Payment gateway error: ${rzpDesc}`
+  );
+  outErr.statusCode = isAuthFailure ? 503 : (httpCode || 502);
+  outErr.code       = rzpCode;
+  throw outErr;
+}
+
 // ── Create Razorpay Order ──────────────────────────────────────
 const createRazorpayOrder = async ({ amount, currency = 'INR', receipt, notes = {} }) => {
   try {
@@ -28,8 +53,7 @@ const createRazorpayOrder = async ({ amount, currency = 'INR', receipt, notes = 
     logger.info('Razorpay order created', { orderId: order.id, amount });
     return order;
   } catch (err) {
-    logger.error('Razorpay order creation failed', { message: err.message });
-    throw err;
+    normaliseRazorpayError(err, 'order creation');
   }
 };
 
@@ -68,8 +92,7 @@ const initiateRefund = async ({ paymentId, amount, notes = {} }) => {
     logger.info('Razorpay refund initiated', { paymentId, refundId: refund.id, amount });
     return refund;
   } catch (err) {
-    logger.error('Razorpay refund failed', { paymentId, message: err.message });
-    throw err;
+    normaliseRazorpayError(err, 'refund');
   }
 };
 
@@ -78,8 +101,7 @@ const fetchPayment = async (paymentId) => {
   try {
     return await razorpay.payments.fetch(paymentId);
   } catch (err) {
-    logger.error('Razorpay fetch payment failed', { paymentId, message: err.message });
-    throw err;
+    normaliseRazorpayError(err, 'fetch payment');
   }
 };
 
