@@ -21,10 +21,18 @@ const { MerchantAuthService, TokenService } = require('../../services/auth.servi
 const { NotificationService }              = require('../../services/notification.service');
 const { query }                            = require('../../config/db');
 const { redis }                            = require('../../config/redis');
+const { createAccessToken, createRefreshToken } = require('../../utils/generators');
 const {
   success, created, badRequest, unauthorized, notFound, conflict,
 } = require('../../utils/response');
 const logger = require('../../config/logger');
+
+const buildMerchantTokenPair = async (merchantId) => {
+  const { token: accessToken } = createAccessToken(merchantId, 'merchant');
+  const { token: refreshToken, jti: refreshJti } = createRefreshToken(merchantId, 'merchant');
+  await redis.set(`mlb:refresh:${merchantId}:merchant`, refreshJti, 30 * 24 * 60 * 60);
+  return { access_token: accessToken, refresh_token: refreshToken, token_type: 'Bearer' };
+};
 
 // ── POST /auth/merchant/send-otp ──────────────────────────────
 // Sends OTP to verify phone number before registration or login
@@ -87,13 +95,7 @@ const verifyOTPHandler = async (req, res) => {
   }
 
   await query('UPDATE merchants SET last_login_at = NOW() WHERE id = $1', [merchant.id]);
-  const tokens = await require('../../services/auth.service').TokenService.refresh ||
-    (await (async () => {
-      const { createAccessToken, createRefreshToken } = require('../../utils/generators');
-      const { token: access }  = createAccessToken(merchant.id, 'merchant');
-      const { token: refresh } = createRefreshToken(merchant.id, 'merchant');
-      return { access_token: access, refresh_token: refresh, token_type: 'Bearer' };
-    })());
+  const tokens = await buildMerchantTokenPair(merchant.id);
 
   const { password_hash, ...safeProfile } = merchant;
   return success(res, { merchant: safeProfile, tokens }, 'Login successful');
