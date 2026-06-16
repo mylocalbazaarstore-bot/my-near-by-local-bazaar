@@ -17,26 +17,49 @@ cloudinary.config({
 });
 
 // ── Folder structure on Cloudinary ────────────────────────────
+const isPresentPathSegment = (segment) => (
+  segment !== undefined && segment !== null && String(segment).trim() !== ''
+);
+
+const joinCloudinaryPath = (...segments) =>
+  segments
+    .filter(isPresentPathSegment)
+    .map((segment) => String(segment).replace(/^\/+|\/+$/g, ''))
+    .join('/');
+
+const getMerchantProductFolder = (req) => {
+  const merchantId = req.user?.id;
+  if (!merchantId) {
+    throw new Error('Merchant identifier missing for product image upload');
+  }
+  return joinCloudinaryPath(
+    process.env.CLOUDINARY_FOLDER,
+    'merchants',
+    merchantId,
+    'products'
+  );
+};
+
 const FOLDERS = {
-  products:       `${process.env.CLOUDINARY_FOLDER}/products`,
-  merchants:      `${process.env.CLOUDINARY_FOLDER}/merchants`,
-  kyc:            `${process.env.CLOUDINARY_FOLDER}/kyc`,
-  users:          `${process.env.CLOUDINARY_FOLDER}/users`,
-  banners:        `${process.env.CLOUDINARY_FOLDER}/banners`,
-  deliveryProof:  `${process.env.CLOUDINARY_FOLDER}/delivery-proof`,
-  reviews:        `${process.env.CLOUDINARY_FOLDER}/reviews`,
-  services:       `${process.env.CLOUDINARY_FOLDER}/services`,
+  products:       joinCloudinaryPath(process.env.CLOUDINARY_FOLDER, 'products'),
+  merchants:      joinCloudinaryPath(process.env.CLOUDINARY_FOLDER, 'merchants'),
+  kyc:            joinCloudinaryPath(process.env.CLOUDINARY_FOLDER, 'kyc'),
+  users:          joinCloudinaryPath(process.env.CLOUDINARY_FOLDER, 'users'),
+  banners:        joinCloudinaryPath(process.env.CLOUDINARY_FOLDER, 'banners'),
+  deliveryProof:  joinCloudinaryPath(process.env.CLOUDINARY_FOLDER, 'delivery-proof'),
+  reviews:        joinCloudinaryPath(process.env.CLOUDINARY_FOLDER, 'reviews'),
+  services:       joinCloudinaryPath(process.env.CLOUDINARY_FOLDER, 'services'),
 };
 
 // ── Multer storage factory ─────────────────────────────────────
 const createStorage = (folder, allowedFormats = ['jpg', 'jpeg', 'png', 'webp']) =>
   new CloudinaryStorage({
     cloudinary,
-    params: {
-      folder,
+    params: async (req, file) => ({
+      folder: typeof folder === 'function' ? await folder(req, file) : folder,
       allowed_formats: allowedFormats,
       transformation: [{ quality: 'auto:good', fetch_format: 'auto' }],
-    },
+    }),
   });
 
 // ── File filter ────────────────────────────────────────────────
@@ -54,7 +77,7 @@ const documentFilter = (req, file, cb) => {
 
 // ── Pre-configured upload middlewares ─────────────────────────
 const uploadProductImage = multer({
-  storage:  createStorage(FOLDERS.products),
+  storage:  createStorage(getMerchantProductFolder),
   fileFilter: imageFilter,
   limits:   { fileSize: 5 * 1024 * 1024 }, // 5MB
 }).array('images', 8);
