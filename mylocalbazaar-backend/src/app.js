@@ -50,7 +50,7 @@ app.use(cors({
 }));
 
 // ── 3. Trust proxy (for Railway / Nginx reverse proxy) ────────
-app.set('trust proxy', 1);
+app.set('trust proxy', 2);
 
 // ── 4. Body Parsers ───────────────────────────────────────────
 // Raw body for Razorpay webhook (MUST come before express.json)
