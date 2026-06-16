@@ -128,7 +128,8 @@ const getMerchant = async (req, res) => {
     [req.params.id]
   );
 
-  return success(res, { merchant: { ...rows[0], operating_hours: hours } });
+  const { password_hash, ...safeMerchant } = rows[0];
+  return success(res, { merchant: { ...safeMerchant, operating_hours: hours } });
 };
 
 // ── POST /admin/merchants/:id/decision ────────────────────────

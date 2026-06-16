@@ -84,7 +84,8 @@ const getCustomer = async (req, res) => {
     [req.params.id]
   );
 
-  return success(res, { customer: { ...rows[0], addresses } });
+  const { password_hash, ...safeCustomer } = rows[0];
+  return success(res, { customer: { ...safeCustomer, addresses } });
 };
 
 // ── POST /admin/customers/:id/block ──────────────────────────
