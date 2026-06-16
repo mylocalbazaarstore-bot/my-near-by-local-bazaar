@@ -15,15 +15,19 @@ const limit = Joi.number().integer().min(1).max(50).default(20);
 const sendOTP = Joi.object({
   phone: Joi.string().pattern(/^[6-9]\d{9}$/).required()
     .messages({ 'string.pattern.base': 'Valid 10-digit Indian mobile number required' }),
+  purpose: Joi.string().valid('register', 'login').required(),
 });
 
 const verifyOTP = Joi.object({
   phone: Joi.string().pattern(/^[6-9]\d{9}$/).required(),
   otp:   Joi.string().length(6).pattern(/^\d{6}$/).required()
     .messages({ 'string.length': 'OTP must be 6 digits' }),
+  purpose: Joi.string().valid('register', 'login').required(),
 });
 
 const registerPartner = Joi.object({
+  phone_verified_token: Joi.string().required()
+    .messages({ 'any.required': 'Phone verification token is required' }),
   full_name:    Joi.string().min(2).max(200).trim().required(),
   email:        Joi.string().email().lowercase().trim().optional(),
   password:     Joi.string().min(8).required(),

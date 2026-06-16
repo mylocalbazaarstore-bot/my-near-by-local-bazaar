@@ -351,8 +351,15 @@ const AssignmentService = {
         [partnerId]
       );
 
-      logger.info('Delivery OTP verified — order delivered', { partnerId, orderId });
-      return { verified: true, order_id: orderId };
+      const earnings = await EarningsService.creditEarnings(
+        client,
+        partnerId,
+        orderId,
+        parseFloat(assignment.distance_km || 0)
+      );
+
+      logger.info('Delivery OTP verified — order delivered', { partnerId, orderId, earnings });
+      return { verified: true, order_id: orderId, earnings };
     });
   },
 
