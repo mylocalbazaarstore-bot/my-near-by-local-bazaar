@@ -58,6 +58,14 @@ const restrictToAdminIPs = (req, res, next) => {
   const allowedIPs = (process.env.ADMIN_ALLOWED_IPS || '').split(',').map(ip => ip.trim());
   const clientIP   = req.ip || req.connection.remoteAddress;
 
+  console.log('[IP DEBUG]', {
+    reqIp: req.ip,
+    xForwardedFor: req.headers['x-forwarded-for'],
+    remoteAddress: req.socket?.remoteAddress,
+    allowedIPs,
+    match: allowedIPs.includes(clientIP),
+  });
+
   if (process.env.NODE_ENV === 'development') return next(); // skip in dev
 
   if (!allowedIPs.includes(clientIP)) {
