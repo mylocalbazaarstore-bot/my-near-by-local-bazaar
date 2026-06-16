@@ -24,15 +24,38 @@
 // ─────────────────────────────────────────────────────────────
 
 const ProductService = require('../../services/product.service');
+const { FeatureGate, PlanService } = require('../../services/saas.service');
 const { deleteMedia } = require('../../config/cloudinary');
 const {
-  success, created, badRequest, notFound, paginated,
+  success, created, badRequest, forbidden, notFound, paginated,
 } = require('../../utils/response');
 const logger = require('../../config/logger');
+
+const getPlanName = async (merchantId) => {
+  const plan = await PlanService.getCurrentPlan(merchantId);
+  return plan?.plan || 'current';
+};
+
+const productLimitMessage = (plan, current, limit) =>
+  `Product limit reached for your ${plan} plan (${current}/${limit}). Upgrade your plan to add more products.`;
+
+const imageLimitMessage = (plan, limit) =>
+  `Image limit reached for your ${plan} plan (max ${limit} images per product). Upgrade your plan to add more images.`;
 
 // ── POST /merchant/products ────────────────────────────────────
 const createProduct = async (req, res) => {
   const merchantId = req.user.id;
+  const gate = await FeatureGate.canAddProduct(merchantId);
+
+  if (!gate.allowed) {
+    const plan = await getPlanName(merchantId);
+    return forbidden(
+      res,
+      productLimitMessage(plan, gate.current_count, gate.max_allowed),
+      'PLAN_LIMIT_EXCEEDED'
+    );
+  }
+
   const product    = await ProductService.create(merchantId, req.body);
   return created(res, { product }, 'Product submitted for admin approval');
 };
@@ -88,7 +111,31 @@ const archiveProduct = async (req, res) => {
 
 // ── POST /merchant/products/bulk ──────────────────────────────
 const bulkUpload = async (req, res) => {
-  const results = await ProductService.bulkCreate(req.user.id, req.body.products);
+  const merchantId = req.user.id;
+  const incomingProducts = req.body.products || [];
+  const gate = await FeatureGate.canAddProduct(merchantId);
+  const current = gate.current_count || 0;
+  const limit = gate.max_allowed;
+
+  if (limit !== undefined && current + incomingProducts.length > limit) {
+    const plan = await getPlanName(merchantId);
+    return forbidden(
+      res,
+      `Adding ${incomingProducts.length} products would exceed your ${plan} plan limit (${current}/${limit} used, ${Math.max(limit - current, 0)} remaining). Upgrade your plan or reduce the batch size.`,
+      'PLAN_LIMIT_EXCEEDED'
+    );
+  }
+
+  if (!gate.allowed) {
+    const plan = await getPlanName(merchantId);
+    return forbidden(
+      res,
+      productLimitMessage(plan, current, limit),
+      'PLAN_LIMIT_EXCEEDED'
+    );
+  }
+
+  const results = await ProductService.bulkCreate(merchantId, incomingProducts);
   const statusCode = results.failed.length === 0 ? 201
     : results.success.length === 0 ? 422
     : 207; // 207 Multi-Status: partial success
@@ -120,7 +167,23 @@ const addImages = async (req, res) => {
   const files = req.files;
   if (!files?.length) return badRequest(res, 'No image files uploaded');
 
-  const images = await ProductService.addImages(req.params.id, req.user.id, files);
+  const merchantId = req.user.id;
+  const productId = req.params.id;
+  const gate = await FeatureGate.canUploadImages(merchantId, productId);
+  const exceedsBatchLimit = gate.max !== undefined && gate.current + files.length > gate.max;
+
+  if (!gate.allowed || exceedsBatchLimit) {
+    const currentPlan = await PlanService.getCurrentPlan(merchantId);
+    const plan = currentPlan?.plan || 'current';
+    const maxImages = gate.max || currentPlan?.limits?.max_images_per_product || 'allowed';
+    return forbidden(
+      res,
+      imageLimitMessage(plan, maxImages),
+      'IMAGE_LIMIT_EXCEEDED'
+    );
+  }
+
+  const images = await ProductService.addImages(productId, merchantId, files);
   return created(res, { images }, `${images.length} image(s) uploaded`);
 };
 
