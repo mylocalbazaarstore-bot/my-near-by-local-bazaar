@@ -67,7 +67,7 @@ const { franchiseController: fCtrl } = require('../controllers/ai/recommendation
 // Public
 franchiseRouter.post('/apply',                validate(V.franchiseApply), fCtrl.apply);
 franchiseRouter.get('/territories',           fCtrl.getTerritories);
-franchiseRouter.get('/:id/earnings',          fCtrl.getEarnings);
+franchiseRouter.get('/:id/earnings',          ...aAuth, fCtrl.getEarnings);
 
 // Admin only
 franchiseRouter.get('/admin/applications',    ...aAuth, fCtrl.listApplications);

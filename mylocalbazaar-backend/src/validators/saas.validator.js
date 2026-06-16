@@ -71,7 +71,6 @@ const franchiseApply = Joi.object({
 
 // ── Franchise Onboarding (Admin approves) ─────────────────────
 const franchiseOnboard = Joi.object({
-  application_id:   uuid.required(),
   territory_name:   Joi.string().min(2).max(200).required(),
   territory_city:   Joi.string().min(2).max(100).required(),
   territory_state:  Joi.string().min(2).max(100).required(),

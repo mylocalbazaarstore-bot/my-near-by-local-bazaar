@@ -237,10 +237,13 @@ const FranchiseService = {
            AND o.created_at >= NOW() - INTERVAL '${INTERVAL}'), 0) AS period_gmv,
          COUNT(DISTINCT o.id) FILTER (WHERE o.order_status = 'delivered')::int AS total_orders,
          COUNT(DISTINCT o.user_id)::int AS unique_customers
-       FROM merchants m
-       JOIN orders o ON o.merchant_id = m.id
-       WHERE LOWER(m.city) = LOWER($1)`,
-      [fa[0].territory_city]
+       FROM franchise_applications fa
+       LEFT JOIN cities   c ON c.id = fa.city_id
+       LEFT JOIN areas    a ON a.city_id = c.id
+       LEFT JOIN merchants m ON m.area_id = a.id
+       LEFT JOIN orders   o ON o.merchant_id = m.id
+       WHERE fa.id = $1`,
+      [franchiseId]
     );
 
     const totalGmv  = parseFloat(rows[0].total_gmv);
