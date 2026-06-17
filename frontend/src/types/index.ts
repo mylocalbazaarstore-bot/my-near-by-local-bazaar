@@ -362,14 +362,14 @@ export const CATEGORIES: CategoryUIConfig[] = [
     iconBg: 'bg-cyan-100',
   },
   {
-    slug: 'mens-salon', label: "Men's Salon Appointment Booking", emoji: '💈',
+    slug: 'mens-salon', label: "Men's Salon Appointment", emoji: '💈',
     color: 'bg-mens_salon', textColor: 'text-mens_salon', accent: 'bg-slate-400',
     bgLight: 'bg-blue-50',
     gradient: 'linear-gradient(135deg, #1E3A8A 0%, #475569 100%)',
     iconBg: 'bg-blue-100',
   },
   {
-    slug: 'womens-salon', label: "Women's Salon Appointment Booking", emoji: '💅',
+    slug: 'womens-salon', label: "Women's Salon Appointment", emoji: '💅',
     color: 'bg-womens_salon', textColor: 'text-pink-400', accent: 'bg-yellow-400',
     bgLight: 'bg-pink-50',
     gradient: 'linear-gradient(135deg, #F9A8D4 0%, #FBBF24 100%)',
@@ -418,7 +418,7 @@ export const CATEGORIES: CategoryUIConfig[] = [
     iconBg: 'bg-orange-100',
   },
   {
-    slug: 'banquet-hall', label: 'Banquet Hall Booking', emoji: '🏛️',
+    slug: 'banquet-hall', label: 'Banquet Hall', emoji: '🏛️',
     color: 'bg-indigo-500', textColor: 'text-indigo-600', accent: 'bg-purple-700',
     bgLight: 'bg-indigo-50',
     gradient: 'linear-gradient(135deg, #6366F1 0%, #7C3AED 100%)',
