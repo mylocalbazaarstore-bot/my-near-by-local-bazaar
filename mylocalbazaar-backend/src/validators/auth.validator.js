@@ -157,7 +157,7 @@ const merchantRegister = Joi.object({
     .valid(
       'grocery_fmcg', 'wholesale', 'electronics', 'hardware',
       'clothing', 'medical', 'food_tea_stall', 'food_chaat_chinese',
-      'specialty', 'service', 'food_restaurant'
+      'specialty', 'service', 'food_restaurant', 'furniture'
     )
     .required()
     .messages({ 'any.required': 'Store category is required' }),

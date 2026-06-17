@@ -424,4 +424,11 @@ export const CATEGORIES: CategoryUIConfig[] = [
     gradient: 'linear-gradient(135deg, #6366F1 0%, #7C3AED 100%)',
     iconBg: 'bg-indigo-100',
   },
+  {
+    slug: 'furniture', label: 'Furniture Store', emoji: '🪑',
+    color: 'bg-amber-800', textColor: 'text-amber-800', accent: 'bg-amber-900',
+    bgLight: 'bg-amber-50',
+    gradient: 'linear-gradient(135deg, #92400E 0%, #78350F 100%)',
+    iconBg: 'bg-amber-100',
+  },
 ];

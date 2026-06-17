@@ -15,7 +15,7 @@ import { CATEGORIES, type CategoryUIConfig, type Category } from '@/types';
 // ── Category groupings ─────────────────────────────────────────
 const SHOP_SLUGS = [
   'grocery-fmcg', 'wholesale', 'electronics', 'hardware', 'clothing',
-  'medical', 'tea-stall', 'chaat-chinese', 'jewellery', 'restaurant',
+  'medical', 'tea-stall', 'chaat-chinese', 'jewellery', 'restaurant', 'furniture',
 ];
 const SERVICE_SLUGS = [
   'doctor-booking', 'home-services', 'mens-salon', 'womens-salon', 'banquet-hall',
@@ -128,6 +128,47 @@ function SectionLabel({ label }: { label: string }) {
       </span>
       <div className="flex-1 h-px bg-surface-200" />
     </div>
+  );
+}
+
+// ── Finance / EMI Banner ───────────────────────────────────────
+function FinanceBanner() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96 }}
+      whileInView={{ opacity: 1, scale: 1 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.5 }}
+      className="rounded-3xl overflow-hidden relative border border-white/10 shadow-card"
+      style={{ background: 'linear-gradient(135deg, #1E3A8A 0%, #1D4ED8 50%, #1E3A8A 100%)' }}
+    >
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-64 h-64 rounded-full
+                        bg-blue-400/20 blur-3xl -translate-y-1/2" />
+        <div className="absolute bottom-0 right-1/4 w-64 h-64 rounded-full
+                        bg-cyan-400/10 blur-3xl translate-y-1/2" />
+      </div>
+      <div className="relative z-10 flex flex-col sm:flex-row items-center
+                      justify-between gap-4 p-6 sm:p-8">
+        <div>
+          <p className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-1">
+            Easy Installments
+          </p>
+          <h3 className="font-display text-2xl sm:text-3xl font-bold text-white">
+            💳 EMI Available on Electronics &amp; Furniture
+          </h3>
+          <p className="text-white/60 text-sm mt-1">
+            Buy now, pay later — easy installment options. Call us to know more.
+          </p>
+        </div>
+        <a
+          href="tel:8398975653"
+          className="flex-shrink-0 btn-primary text-sm !px-6 !py-3 shadow-glow-green"
+        >
+          📞 Call 8398975653
+        </a>
+      </div>
+    </motion.div>
   );
 }
 
@@ -252,6 +293,11 @@ export default function CategoryGrid() {
               count={getCount(cat.slug)}
             />
           ))}
+        </div>
+
+        {/* ── Finance / EMI banner ─────────────────────────── */}
+        <div className="mb-4">
+          <FinanceBanner />
         </div>
 
         {/* ── Specialty Stores banner ──────────────────────── */}
