@@ -69,6 +69,7 @@ export interface CartMerchant {
   is_open: boolean;
   merchant_status: string;
   accepts_cod: boolean;
+  upi_id?: string | null;
 }
 
 export interface Cart {
