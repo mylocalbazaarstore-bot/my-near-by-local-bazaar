@@ -1,7 +1,7 @@
 'use client';
 // src/components/home/CategoryGrid.tsx
 // ─────────────────────────────────────────────────────────────
-// 13 Category Cards — MyLocalBazaar Homepage
+// 16 Category Cards — MyLocalBazaar Homepage
 // Each card uses the exact brand colors from master prompt:
 //   Grocery: Green + Orange | Electronics: Blue + White
 //   Medical: White + Blue + Red | Men's Salon: Dark Blue + Silver
@@ -173,8 +173,8 @@ export default function CategoryGrid() {
   }, []);
 
   // Split into two rows with the promo banner between them
-  const firstRow  = CATEGORIES.slice(0, 7);
-  const secondRow = CATEGORIES.slice(7);
+  const firstRow  = CATEGORIES.slice(0, 8);
+  const secondRow = CATEGORIES.slice(8);
 
   return (
     <section ref={sectionRef} className="py-12 md:py-16 bg-surface-50">
@@ -215,8 +215,8 @@ export default function CategoryGrid() {
           </motion.div>
         </div>
 
-        {/* ── First row: 7 categories ──────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-3">
+        {/* ── First row: 8 categories ──────────────────────── */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-3">
           {firstRow.map((cat, i) => (
             <CategoryCard key={cat.slug} cat={cat} index={i} count={countsLoaded ? counts[cat.slug] ?? 0 : undefined} />
           ))}
@@ -227,10 +227,10 @@ export default function CategoryGrid() {
           <FestivalBanner />
         </div>
 
-        {/* ── Second row: 6 categories ─────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        {/* ── Second row: 8 categories ─────────────────────── */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-3">
           {secondRow.map((cat, i) => (
-            <CategoryCard key={cat.slug} cat={cat} index={i + 7} count={countsLoaded ? counts[cat.slug] ?? 0 : undefined} />
+            <CategoryCard key={cat.slug} cat={cat} index={i + 8} count={countsLoaded ? counts[cat.slug] ?? 0 : undefined} />
           ))}
         </div>
 

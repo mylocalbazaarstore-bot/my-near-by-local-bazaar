@@ -310,7 +310,7 @@ export interface CategoryUIConfig {
   iconBg:     string;
 }
 
-// The 13 categories with full UI config — used by CategoryGrid
+// The 16 categories with full UI config — used by CategoryGrid
 export const CATEGORIES: CategoryUIConfig[] = [
   {
     slug: 'grocery-fmcg', label: 'Grocery & FMCG', emoji: '🛒',
@@ -402,5 +402,26 @@ export const CATEGORIES: CategoryUIConfig[] = [
     bgLight: 'bg-purple-50',
     gradient: 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)',
     iconBg: 'bg-purple-100',
+  },
+  {
+    slug: 'jewellery', label: 'Jewellery Store', emoji: '💍',
+    color: 'bg-amber-500', textColor: 'text-amber-600', accent: 'bg-amber-600',
+    bgLight: 'bg-amber-50',
+    gradient: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+    iconBg: 'bg-amber-100',
+  },
+  {
+    slug: 'restaurant', label: 'Restaurant', emoji: '🍽️',
+    color: 'bg-orange-700', textColor: 'text-orange-700', accent: 'bg-red-700',
+    bgLight: 'bg-orange-50',
+    gradient: 'linear-gradient(135deg, #EA580C 0%, #B91C1C 100%)',
+    iconBg: 'bg-orange-100',
+  },
+  {
+    slug: 'banquet-hall', label: 'Banquet Hall', emoji: '🏛️',
+    color: 'bg-indigo-500', textColor: 'text-indigo-600', accent: 'bg-purple-700',
+    bgLight: 'bg-indigo-50',
+    gradient: 'linear-gradient(135deg, #6366F1 0%, #7C3AED 100%)',
+    iconBg: 'bg-indigo-100',
   },
 ];
