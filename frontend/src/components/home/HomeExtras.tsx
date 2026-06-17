@@ -26,7 +26,7 @@ const STEPS = [
     step: '02',
     icon: ShoppingCart,
     title: 'Shop or Book',
-    desc: 'Browse products across 13 categories or book services like doctor, salon, home repair.',
+    desc: 'Browse products across 16 categories or book services like doctor, salon, home repair.',
     color: 'text-brand-orange',
     bg:    'bg-orange-50',
     border: 'border-orange-200',

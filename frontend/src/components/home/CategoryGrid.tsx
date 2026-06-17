@@ -2,11 +2,7 @@
 // src/components/home/CategoryGrid.tsx
 // ─────────────────────────────────────────────────────────────
 // 16 Category Cards — MyLocalBazaar Homepage
-// Each card uses the exact brand colors from master prompt:
-//   Grocery: Green + Orange | Electronics: Blue + White
-//   Medical: White + Blue + Red | Men's Salon: Dark Blue + Silver
-//   Women's Salon: Pink + White + Gold | Home Services: Yellow + Blue
-//   Food: Orange + Red | etc.
+// Layout: 10 shop categories | specialty banner | 5 service categories
 // ─────────────────────────────────────────────────────────────
 
 import React, { useRef, useState, useEffect } from 'react';
@@ -16,9 +12,27 @@ import { ArrowRight } from 'lucide-react';
 import { apiGet } from '@/lib/api';
 import { CATEGORIES, type CategoryUIConfig, type Category } from '@/types';
 
-// ── Individual Category Card ──────────────────────────────────
-// `count` = live merchant count for this category (undefined = still loading)
-function CategoryCard({ cat, index, count }: { cat: CategoryUIConfig; index: number; count?: number }) {
+// ── Category groupings ─────────────────────────────────────────
+const SHOP_SLUGS = [
+  'grocery-fmcg', 'wholesale', 'electronics', 'hardware', 'clothing',
+  'medical', 'tea-stall', 'chaat-chinese', 'jewellery', 'restaurant',
+];
+const SERVICE_SLUGS = [
+  'doctor-booking', 'home-services', 'mens-salon', 'womens-salon', 'banquet-hall',
+];
+
+// ── Individual Category Card ───────────────────────────────────
+function CategoryCard({
+  cat,
+  index,
+  count,
+  cta = 'Shop Now',
+}: {
+  cat: CategoryUIConfig;
+  index: number;
+  count?: number;
+  cta?: string;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
@@ -97,7 +111,7 @@ function CategoryCard({ cat, index, count }: { cat: CategoryUIConfig; index: num
             {cat.label}
           </p>
           <p className="text-[11px] text-surface-400 mt-0.5 font-medium">
-            Shop Now →
+            {cta} →
           </p>
         </div>
       </Link>
@@ -105,43 +119,54 @@ function CategoryCard({ cat, index, count }: { cat: CategoryUIConfig; index: num
   );
 }
 
-// ── Festival Banner (between rows) ────────────────────────────
-function FestivalBanner() {
+// ── Section divider label ──────────────────────────────────────
+function SectionLabel({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 mb-3">
+      <span className="text-[10px] font-bold text-surface-500 uppercase tracking-widest whitespace-nowrap">
+        {label}
+      </span>
+      <div className="flex-1 h-px bg-surface-200" />
+    </div>
+  );
+}
+
+// ── Specialty Banner ───────────────────────────────────────────
+function SpecialtyBanner() {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.96 }}
       whileInView={{ opacity: 1, scale: 1 }}
       viewport={{ once: true }}
       transition={{ duration: 0.5 }}
-      className="col-span-full rounded-3xl overflow-hidden relative
-                 bg-gradient-to-r from-brand-dark via-surface-900 to-brand-dark
+      className="rounded-3xl overflow-hidden relative
                  border border-white/10 shadow-card"
+      style={{ background: 'linear-gradient(135deg, #4C1D95 0%, #5B21B6 50%, #4C1D95 100%)' }}
     >
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/4 w-64 h-64 rounded-full
-                        bg-brand-green/10 blur-3xl -translate-y-1/2" />
+                        bg-violet-400/20 blur-3xl -translate-y-1/2" />
         <div className="absolute bottom-0 right-1/4 w-64 h-64 rounded-full
-                        bg-brand-orange/10 blur-3xl translate-y-1/2" />
+                        bg-amber-400/10 blur-3xl translate-y-1/2" />
       </div>
       <div className="relative z-10 flex flex-col sm:flex-row items-center
                       justify-between gap-4 p-6 sm:p-8">
         <div>
           <p className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-1">
-            Limited Time Offer
+            Curated Collection
           </p>
           <h3 className="font-display text-2xl sm:text-3xl font-bold text-white">
-            First Order <span className="text-gradient">Free Delivery</span>
+            ⭐ <span className="text-gradient">Specialty Stores</span>
           </h3>
           <p className="text-white/60 text-sm mt-1">
-            Use code <span className="font-bold text-brand-orange bg-orange-500/10
-                                       px-2 py-0.5 rounded-md">WELCOME50</span> at checkout
+            Unique local stores with exclusive finds — jewellers, boutiques & more
           </p>
         </div>
         <Link
-          href="/categories"
+          href="/categories/specialty"
           className="flex-shrink-0 btn-primary text-sm !px-6 !py-3 shadow-glow-green"
         >
-          Shop All Categories
+          Explore Specialty
         </Link>
       </div>
     </motion.div>
@@ -155,8 +180,7 @@ export default function CategoryGrid() {
   const sectionRef = useRef<HTMLDivElement>(null);
   const inView     = useInView(sectionRef, { once: true, margin: '-80px' });
 
-  // Live merchant counts per category slug — undefined while loading
-  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [counts, setCounts]           = useState<Record<string, number>>({});
   const [countsLoaded, setCountsLoaded] = useState(false);
 
   useEffect(() => {
@@ -168,13 +192,15 @@ export default function CategoryGrid() {
         });
         setCounts(map);
       })
-      .catch(() => { /* graceful degradation — counts simply stay empty */ })
+      .catch(() => {})
       .finally(() => setCountsLoaded(true));
   }, []);
 
-  // Split into two rows with the promo banner between them
-  const firstRow  = CATEGORIES.slice(0, 8);
-  const secondRow = CATEGORIES.slice(8);
+  const shopCategories    = CATEGORIES.filter(c => SHOP_SLUGS.includes(c.slug));
+  const serviceCategories = CATEGORIES.filter(c => SERVICE_SLUGS.includes(c.slug));
+
+  const getCount = (slug: string) =>
+    countsLoaded ? counts[slug] ?? 0 : undefined;
 
   return (
     <section ref={sectionRef} className="py-12 md:py-16 bg-surface-50">
@@ -215,22 +241,35 @@ export default function CategoryGrid() {
           </motion.div>
         </div>
 
-        {/* ── First row: 8 categories ──────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-3 mb-3">
-          {firstRow.map((cat, i) => (
-            <CategoryCard key={cat.slug} cat={cat} index={i} count={countsLoaded ? counts[cat.slug] ?? 0 : undefined} />
+        {/* ── SHOP BY CATEGORY: 10 product/goods categories ─ */}
+        <SectionLabel label="Shop by Category" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-4">
+          {shopCategories.map((cat, i) => (
+            <CategoryCard
+              key={cat.slug}
+              cat={cat}
+              index={i}
+              count={getCount(cat.slug)}
+            />
           ))}
         </div>
 
-        {/* ── Festival banner ──────────────────────────────── */}
-        <div className="grid grid-cols-1 gap-3 mb-3">
-          <FestivalBanner />
+        {/* ── Specialty Stores banner ──────────────────────── */}
+        <div className="mb-4">
+          <SpecialtyBanner />
         </div>
 
-        {/* ── Second row: 8 categories ─────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-3">
-          {secondRow.map((cat, i) => (
-            <CategoryCard key={cat.slug} cat={cat} index={i + 8} count={countsLoaded ? counts[cat.slug] ?? 0 : undefined} />
+        {/* ── SERVICES BY CATEGORY: 5 service categories ───── */}
+        <SectionLabel label="Services by Category" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+          {serviceCategories.map((cat, i) => (
+            <CategoryCard
+              key={cat.slug}
+              cat={cat}
+              index={i}
+              count={getCount(cat.slug)}
+              cta="Book Now"
+            />
           ))}
         </div>
 
@@ -240,6 +279,7 @@ export default function CategoryGrid() {
             Browse All Categories <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
+
       </div>
     </section>
   );

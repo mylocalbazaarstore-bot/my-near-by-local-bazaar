@@ -32,7 +32,7 @@ export default function HomePage() {
         {/* 1. Hero — search-first, pincode discovery */}
         <HeroSection />
 
-        {/* 2. All 13 category cards with brand colors */}
+        {/* 2. All 16 category cards with brand colors */}
         <CategoryGrid />
 
         {/* 3. Featured & nearest merchant rows */}
