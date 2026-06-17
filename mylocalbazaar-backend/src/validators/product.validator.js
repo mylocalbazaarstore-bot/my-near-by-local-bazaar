@@ -20,7 +20,7 @@ const price   = Joi.number().min(0).precision(2);
 const PRODUCT_STATUSES = ['draft', 'pending_approval', 'active', 'rejected', 'out_of_stock', 'archived'];
 const STORE_CATEGORIES = [
   'grocery_fmcg','wholesale','electronics','hardware','clothing',
-  'medical','food_tea_stall','food_chaat_chinese','specialty','service',
+  'medical','food_tea_stall','food_chaat_chinese','specialty','service','food_restaurant',
 ];
 
 // ═══════════════════════════════════════════════════════════════
