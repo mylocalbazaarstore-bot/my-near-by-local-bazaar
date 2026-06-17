@@ -316,7 +316,7 @@ const refreshToken = async (req, res) => {
 // ── PATCH /auth/merchant/settings ────────────────────────────
 // Update store operational settings (description, min order, delivery radius, COD, WhatsApp)
 const updateSettings = async (req, res) => {
-  const allowed = ['store_description', 'min_order_value', 'delivery_radius_km', 'accepts_cod', 'whatsapp_catalog_link'];
+  const allowed = ['store_description', 'min_order_value', 'delivery_radius_km', 'accepts_cod', 'whatsapp_catalog_link', 'upi_id'];
   const fields  = [];
   const values  = [];
   let   idx     = 1;
@@ -338,7 +338,7 @@ const updateSettings = async (req, res) => {
      SET ${fields.join(', ')}
      WHERE id = $${idx}
      RETURNING id, store_description, min_order_value, delivery_radius_km,
-               accepts_cod, whatsapp_catalog_link, is_open`,
+               accepts_cod, whatsapp_catalog_link, is_open, upi_id`,
     values
   );
 

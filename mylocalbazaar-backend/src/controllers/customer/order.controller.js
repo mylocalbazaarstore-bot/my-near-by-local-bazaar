@@ -17,18 +17,26 @@ const { query } = require('../../config/db');
 const { validate } = require('../../middlewares/validate.middleware');
 
 // ── POST /orders ──────────────────────────────────────────────
-// Body: { address_id, payment_method, coupon_code?, notes?, use_wallet? }
+// Body: { address_id, payment_method, coupon_code?, notes?, use_wallet?, payment_utr?, payment_screenshot_url? }
 const placeOrder = async (req, res) => {
   const result = await OrderService.place(req.user.id, req.body);
 
-  const statusCode = req.body.payment_method === 'cod' ||
-                     req.body.payment_method === 'wallet' ? 201 : 200;
+  const instantMethods = ['cod', 'wallet', 'upi_direct'];
+  const statusCode = instantMethods.includes(req.body.payment_method) ? 201 : 200;
 
   return res.status(statusCode).json({
     success: true,
     message: result.message,
     data:    result,
   });
+};
+
+// ── POST /orders/upload-proof ────────────────────────────────
+// Upload a UPI payment screenshot to Cloudinary before order creation.
+// Returns { url } — the Cloudinary URL to include in payment_screenshot_url.
+const uploadPaymentProof = async (req, res) => {
+  if (!req.file) return badRequest(res, 'No screenshot file uploaded');
+  return success(res, { url: req.file.path }, 'Screenshot uploaded');
 };
 
 // ── POST /orders/verify ───────────────────────────────────────
@@ -97,4 +105,4 @@ const cancelOrder = async (req, res) => {
   return success(res, null, 'Order cancelled successfully');
 };
 
-module.exports = { placeOrder, verifyPayment, listOrders, getOrder, raiseReturn, cancelOrder };
+module.exports = { placeOrder, uploadPaymentProof, verifyPayment, listOrders, getOrder, raiseReturn, cancelOrder };

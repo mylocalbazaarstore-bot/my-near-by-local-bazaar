@@ -8,6 +8,7 @@
 const express   = require('express');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 const { validate }                = require('../middlewares/validate.middleware');
+const { uploadPaymentScreenshot } = require('../config/cloudinary');
 const V         = require('../validators/cart.validator');
 
 const customerOrderCtrl = require('../controllers/customer/order.controller');
@@ -17,8 +18,9 @@ const merchantOrderCtrl = require('../controllers/merchant/order.controller');
 const customerOrderRouter = express.Router();
 customerOrderRouter.use(authenticate, authorize('customer'));
 
-// 'verify' and specific action routes BEFORE '/:id'
+// 'verify', 'upload-proof' and specific action routes BEFORE '/:id'
 customerOrderRouter.post('/verify',         validate(V.verifyPayment), customerOrderCtrl.verifyPayment);
+customerOrderRouter.post('/upload-proof',   uploadPaymentScreenshot,   customerOrderCtrl.uploadPaymentProof);
 customerOrderRouter.post('/',               validate(V.placeOrder),    customerOrderCtrl.placeOrder);
 customerOrderRouter.get('/',                validate(V.orderListQuery, 'query'), customerOrderCtrl.listOrders);
 customerOrderRouter.get('/:id',                                         customerOrderCtrl.getOrder);

@@ -47,13 +47,25 @@ const placeOrder = Joi.object({
   address_id:    uuid.required()
     .messages({ 'any.required': 'Delivery address is required' }),
   payment_method: Joi.string()
-    .valid('razorpay', 'upi', 'wallet', 'cod')
+    .valid('razorpay', 'upi', 'wallet', 'cod', 'upi_direct')
     .required()
     .messages({ 'any.required': 'Payment method is required' }),
   coupon_code: Joi.string().max(50).trim().uppercase().optional().allow('', null),
   notes:       Joi.string().max(500).trim().optional().allow('', null),
   // For wallet partial payment top-up
   use_wallet:  Joi.boolean().default(false),
+  // UPI Direct fields — at least one required when payment_method === 'upi_direct'
+  payment_utr:              Joi.string().max(50).trim().optional().allow('', null),
+  payment_screenshot_url:   Joi.string().uri().max(500).optional().allow('', null),
+}).custom((value, helpers) => {
+  if (value.payment_method === 'upi_direct') {
+    const hasUtr        = !!(value.payment_utr        && value.payment_utr.trim());
+    const hasScreenshot = !!(value.payment_screenshot_url && value.payment_screenshot_url.trim());
+    if (!hasUtr && !hasScreenshot) {
+      return helpers.message('Please provide a UTR number or payment screenshot for UPI Direct payment');
+    }
+  }
+  return value;
 });
 
 // Verify Razorpay payment after frontend checkout

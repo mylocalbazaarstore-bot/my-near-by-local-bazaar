@@ -44,6 +44,7 @@ function StoreSettings() {
     delivery_radius_km:    '',
     accepts_cod:           true,
     whatsapp_catalog_link: '',
+    upi_id:                '',
   });
   const [isOpen,      setIsOpen]      = useState(true);
   const [toggling,    setToggling]    = useState(false);
@@ -66,6 +67,7 @@ function StoreSettings() {
           delivery_radius_km:    m.delivery_radius_km    != null ? String(m.delivery_radius_km) : '',
           accepts_cod:           m.accepts_cod           ?? true,
           whatsapp_catalog_link: m.whatsapp_catalog_link || '',
+          upi_id:                m.upi_id                || '',
         });
       })
       .catch(() => {})
@@ -229,6 +231,22 @@ function StoreSettings() {
             onChange={(e) => setForm((f) => ({ ...f, whatsapp_catalog_link: e.target.value }))}
             placeholder="https://wa.me/c/…" className="input-field"
           />
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-surface-500 uppercase tracking-wider mb-1.5">
+            UPI ID for Customer Payments (optional)
+          </label>
+          <input
+            type="text"
+            value={form.upi_id}
+            onChange={(e) => setForm((f) => ({ ...f, upi_id: e.target.value }))}
+            placeholder="yourstore@upi"
+            className="input-field"
+          />
+          <p className="text-[11px] text-surface-400 mt-1">
+            Customers will see a QR code and can pay you directly via UPI at checkout
+          </p>
         </div>
 
         <label className="flex items-center gap-3 cursor-pointer">

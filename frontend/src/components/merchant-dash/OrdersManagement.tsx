@@ -94,6 +94,43 @@ function OrderCard({ order, onAction }: {
         </div>
       )}
 
+      {/* UPI Direct payment verification — shown for payment_processed UPI Direct orders */}
+      {order.payment_method === 'upi_direct' && order.order_status === 'payment_processed' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-3 space-y-2">
+          <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">
+            ⚠️ Verify UPI Payment Before Approving
+          </p>
+          {order.payment_utr && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-surface-500 font-semibold">UTR:</span>
+              <span className="font-mono text-sm font-bold text-surface-900 select-all">
+                {order.payment_utr}
+              </span>
+            </div>
+          )}
+          {order.payment_screenshot_url && (
+            <div>
+              <span className="text-[11px] text-surface-500 font-semibold">Screenshot:</span>
+              <a
+                href={order.payment_screenshot_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block mt-1"
+              >
+                <img
+                  src={order.payment_screenshot_url}
+                  alt="Payment screenshot"
+                  className="w-20 h-20 object-cover rounded-lg border border-amber-300 hover:opacity-80 transition-opacity"
+                />
+              </a>
+            </div>
+          )}
+          {!order.payment_utr && !order.payment_screenshot_url && (
+            <p className="text-[11px] text-amber-600">No UTR or screenshot provided — contact customer before approving.</p>
+          )}
+        </div>
+      )}
+
       {/* Action buttons */}
       <div className="flex gap-2 mt-1">
         {/* Approve / Reject — only for payment_processed */}

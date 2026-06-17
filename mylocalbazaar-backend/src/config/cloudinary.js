@@ -49,6 +49,7 @@ const FOLDERS = {
   deliveryProof:  joinCloudinaryPath(process.env.CLOUDINARY_FOLDER, 'delivery-proof'),
   reviews:        joinCloudinaryPath(process.env.CLOUDINARY_FOLDER, 'reviews'),
   services:       joinCloudinaryPath(process.env.CLOUDINARY_FOLDER, 'services'),
+  paymentProof:   joinCloudinaryPath(process.env.CLOUDINARY_FOLDER, 'payment-proof'),
 };
 
 // ── Multer storage factory ─────────────────────────────────────
@@ -125,6 +126,12 @@ const uploadReviewImages = multer({
   limits:   { fileSize: 3 * 1024 * 1024 },
 }).array('images', 4);
 
+const uploadPaymentScreenshot = multer({
+  storage:  createStorage(FOLDERS.paymentProof),
+  fileFilter: imageFilter,
+  limits:   { fileSize: 5 * 1024 * 1024 },
+}).single('screenshot');
+
 // ── Delete media helper ────────────────────────────────────────
 const deleteMedia = async (publicId) => {
   try {
@@ -147,5 +154,6 @@ module.exports = {
   uploadUserAvatar,
   uploadBanner,
   uploadReviewImages,
+  uploadPaymentScreenshot,
   deleteMedia,
 };

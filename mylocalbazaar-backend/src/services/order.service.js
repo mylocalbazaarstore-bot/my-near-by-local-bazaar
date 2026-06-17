@@ -104,7 +104,7 @@ const OrderService = {
   // STEP 1: PLACE ORDER
   // Creates the order record and initiates payment
   // ════════════════════════════════════════════════════════════
-  place: async (userId, { address_id, payment_method, coupon_code, notes, use_wallet }) => {
+  place: async (userId, { address_id, payment_method, coupon_code, notes, use_wallet, payment_utr, payment_screenshot_url }) => {
     return withTransaction(async (client) => {
 
       // 1a. Validate cart is ready
@@ -195,8 +195,9 @@ const OrderService = {
            order_number, user_id, merchant_id,
            delivery_address, area_id, is_within_delivery_zone,
            subtotal, discount_amount, coupon_code, delivery_charge, gst_amount, total_amount,
-           payment_method, payment_status, order_status, notes
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending','payment_pending',$14)
+           payment_method, payment_status, order_status, notes,
+           payment_utr, payment_screenshot_url
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending','payment_pending',$14,$15,$16)
          RETURNING *`,
         [
           orderNumber, userId, merchantId,
@@ -217,6 +218,8 @@ const OrderService = {
           deliveryCharge, gstAmount, totalAmount,
           payment_method,
           notes || null,
+          payment_utr || null,
+          payment_screenshot_url || null,
         ]
       );
 
@@ -287,6 +290,39 @@ const OrderService = {
           order: { ...order, order_status: 'payment_processed', payment_status: 'captured' },
           payment: { method: 'cod', payable: payableAmount },
           message: 'Order placed! Awaiting merchant confirmation.',
+        };
+      }
+
+      // 1k2. For UPI Direct: customer pays merchant directly, move to payment_processed immediately
+      if (payment_method === 'upi_direct') {
+        await client.query(
+          `UPDATE orders
+           SET order_status = 'payment_processed', payment_status = 'captured',
+               payment_processed_at = NOW(), paid_at = NOW()
+           WHERE id = $1`,
+          [order.id]
+        );
+        await logStatusChange(client, order.id, 'payment_pending', 'payment_processed', 'customer', userId, 'UPI Direct payment');
+
+        notify(merchantId, 'merchant', 'order',
+          '🛒 New UPI Order Received!',
+          `Order ${orderNumber} worth ₹${totalAmount} paid via UPI Direct. Verify payment before approving.`,
+          { order_id: order.id, order_number: orderNumber }
+        );
+
+        await client.query(
+          'DELETE FROM cart_items WHERE cart_id = (SELECT id FROM carts WHERE user_id = $1)',
+          [userId]
+        );
+        await client.query(
+          'UPDATE carts SET merchant_id = NULL WHERE user_id = $1', [userId]
+        );
+        await redis.del(`mlb:cart_detail:${userId}`);
+
+        return {
+          order: { ...order, order_status: 'payment_processed', payment_status: 'captured' },
+          payment: { method: 'upi_direct', payable: payableAmount },
+          message: 'Order placed! Merchant will verify your UPI payment before confirming.',
         };
       }
 

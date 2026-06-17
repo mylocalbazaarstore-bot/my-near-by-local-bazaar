@@ -44,6 +44,7 @@ const listOrders = async (req, res) => {
        o.total_amount, o.subtotal, o.delivery_charge, o.discount_amount,
        o.created_at, o.payment_processed_at, o.merchant_action_at,
        o.delivered_at, o.merchant_rejection_reason, o.delivery_otp,
+       o.payment_utr, o.payment_screenshot_url,
        o.delivery_address->>'full_name'     AS customer_name,
        o.delivery_address->>'phone'         AS customer_phone,
        o.delivery_address->>'address_line1' AS delivery_preview,

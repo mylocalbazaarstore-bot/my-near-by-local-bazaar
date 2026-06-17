@@ -55,7 +55,7 @@ const CartService = {
          pv.retail_price AS variant_price, pv.stock_quantity AS variant_stock,
          m.id AS merchant_id, m.store_name, m.store_slug,
          m.min_order_value, m.delivery_radius_km, m.is_open,
-         m.merchant_status, m.accepts_cod,
+         m.merchant_status, m.accepts_cod, m.upi_id,
          (SELECT image_url FROM product_images pi
           WHERE pi.product_id = p.id AND pi.is_primary = true LIMIT 1) AS image
        FROM cart_items ci
@@ -154,6 +154,7 @@ const CartService = {
         is_open:         merchant.is_open,
         merchant_status: merchant.merchant_status,
         accepts_cod:     merchant.accepts_cod,
+        upi_id:          merchant.upi_id || null,
       } : null,
     };
 
