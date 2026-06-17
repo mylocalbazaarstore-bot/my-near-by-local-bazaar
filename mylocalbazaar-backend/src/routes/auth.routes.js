@@ -39,6 +39,13 @@ customerRouter.post(
   customerCtrl.verifyOTPHandler
 );
 
+customerRouter.post(
+  '/firebase-login',
+  authLimiter,
+  validate(V.customerFirebaseLogin),
+  customerCtrl.firebaseLoginHandler
+);
+
 // Protected (customer must be logged in)
 customerRouter.post(
   '/complete-profile',

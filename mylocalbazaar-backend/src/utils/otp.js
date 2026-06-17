@@ -81,9 +81,10 @@ const sendSMSOTP = async (phone, otp) => {
     const response = await axios.post(
       'https://www.fast2sms.com/dev/bulkV2',
       {
-        variables_values: otp,
-        route: 'otp',
+        route: 'q',
+        message: `Your OTP is ${otp}. Valid for 5 mins - MyLocalBazaar`,
         numbers: phone,
+        flash: 0,
       },
       {
         headers: { authorization: process.env.FAST2SMS_API_KEY },

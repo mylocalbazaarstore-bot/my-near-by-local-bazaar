@@ -3,8 +3,9 @@
 // Customer Authentication Controller — MyLocalBazaar.store
 //
 // FLOW:
-//   POST /auth/customer/send-otp        → Request OTP
-//   POST /auth/customer/verify-otp      → Verify OTP → JWT tokens
+//   POST /auth/customer/send-otp        → Request OTP (legacy SMS/WhatsApp)
+//   POST /auth/customer/verify-otp      → Verify OTP → JWT tokens (legacy)
+//   POST /auth/customer/firebase-login  → Verify Firebase ID token → JWT tokens
 //   POST /auth/customer/complete-profile → Fill name/email (new users)
 //   GET  /auth/customer/me              → Fetch own profile
 //   POST /auth/customer/address         → Add delivery address
@@ -16,11 +17,42 @@
 // ─────────────────────────────────────────────────────────────
 
 const { sendOTP, verifyOTP }             = require('../../utils/otp');
+const { verifyIdToken }                  = require('../../config/firebase');
 const { CustomerAuthService, TokenService } = require('../../services/auth.service');
 const { NotificationService }            = require('../../services/notification.service');
 const { query }                          = require('../../config/db');
 const { success, created, badRequest, unauthorized, notFound } = require('../../utils/response');
 const logger                             = require('../../config/logger');
+
+// ── Shared login/register response (OTP + Firebase share this) ─
+// Finds-or-creates the user for `phone`, fires the welcome
+// notification for brand-new users, and returns { user, tokens }.
+const respondWithSession = async (res, phone, req) => {
+  const { user, isNewUser, tokens } = await CustomerAuthService.loginOrRegister(phone, req);
+
+  if (isNewUser) {
+    NotificationService.sendCustomerWelcome({
+      email:        user.email,
+      phone:        user.phone,
+      name:         user.full_name,
+      referralCode: user.referral_code,
+    }).catch((err) => logger.warn('Welcome notification failed:', { message: err.message }));
+  }
+
+  return success(res, {
+    user: {
+      id:               user.id,
+      full_name:        user.full_name,
+      phone:            user.phone,
+      email:            user.email,
+      referral_code:    user.referral_code,
+      wallet_balance:   user.wallet_balance,
+      is_phone_verified: true,
+      is_new_user:      isNewUser,
+    },
+    tokens,
+  }, isNewUser ? 'Welcome to MyLocalBazaar!' : 'Login successful');
+};
 
 // ── POST /auth/customer/send-otp ──────────────────────────────
 // Request: { phone, purpose? }
@@ -54,31 +86,30 @@ const verifyOTPHandler = async (req, res) => {
     return badRequest(res, otpResult.reason);
   }
 
-  const { user, isNewUser, tokens } = await CustomerAuthService.loginOrRegister(phone, req);
+  return respondWithSession(res, phone, req);
+};
 
-  // Fire welcome notification for brand-new users (non-blocking)
-  if (isNewUser) {
-    NotificationService.sendCustomerWelcome({
-      email:        user.email,
-      phone:        user.phone,
-      name:         user.full_name,
-      referralCode: user.referral_code,
-    }).catch((err) => logger.warn('Welcome notification failed:', { message: err.message }));
+// ── POST /auth/customer/firebase-login ───────────────────────
+// Request: { id_token }  (from Firebase signInWithPhoneNumber)
+// Response: { user, tokens, is_new_user }
+const firebaseLoginHandler = async (req, res) => {
+  const { id_token } = req.body;
+
+  let decoded;
+  try {
+    decoded = await verifyIdToken(id_token);
+  } catch (err) {
+    logger.warn('Firebase ID token verification failed:', { message: err.message });
+    return unauthorized(res, 'Invalid or expired verification. Please try again.');
   }
 
-  return success(res, {
-    user: {
-      id:               user.id,
-      full_name:        user.full_name,
-      phone:            user.phone,
-      email:            user.email,
-      referral_code:    user.referral_code,
-      wallet_balance:   user.wallet_balance,
-      is_phone_verified: true,
-      is_new_user:      isNewUser,
-    },
-    tokens,
-  }, isNewUser ? 'Welcome to MyLocalBazaar!' : 'Login successful');
+  const firebasePhone = decoded.phone_number || '';
+  const phone = firebasePhone.replace(/^\+91/, '');
+  if (!/^[6-9]\d{9}$/.test(phone)) {
+    return badRequest(res, 'Unsupported phone number');
+  }
+
+  return respondWithSession(res, phone, req);
 };
 
 // ── POST /auth/customer/complete-profile ──────────────────────
@@ -223,6 +254,7 @@ const logout = async (req, res) => {
 module.exports = {
   sendOTPHandler,
   verifyOTPHandler,
+  firebaseLoginHandler,
   completeProfile,
   getProfile,
   updateProfile,

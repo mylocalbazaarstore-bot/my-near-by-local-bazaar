@@ -1,5 +1,5 @@
 'use client';
-// src/app/login/page.tsx — Customer OTP Login — MyLocalBazaar
+// src/app/login/page.tsx — Customer Login (Firebase Phone Auth) — MyLocalBazaar
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
@@ -7,12 +7,69 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Loader2, RefreshCw, CheckCircle2, Store } from 'lucide-react';
 import { clsx } from 'clsx';
+import {
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  type ConfirmationResult,
+} from 'firebase/auth';
 import { apiPost, getErrorMessage, tokenStorage } from '@/lib/api';
+import { firebaseAuth } from '@/lib/firebase';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
 
+// ── Invisible reCAPTCHA singleton ────────────────────────────────
+// signInWithPhoneNumber needs a RecaptchaVerifier bound to a DOM
+// node that stays mounted across the phone -> OTP step transition.
+let recaptchaVerifier: RecaptchaVerifier | null = null;
+
+const getRecaptchaVerifier = (): RecaptchaVerifier => {
+  if (!recaptchaVerifier) {
+    recaptchaVerifier = new RecaptchaVerifier(firebaseAuth, 'recaptcha-container', {
+      size: 'invisible',
+    });
+  }
+  return recaptchaVerifier;
+};
+
+const resetRecaptchaVerifier = () => {
+  if (recaptchaVerifier) {
+    try { recaptchaVerifier.clear(); } catch { /* already torn down */ }
+    recaptchaVerifier = null;
+  }
+};
+
+// Map Firebase Auth error codes to friendly, actionable messages
+const firebaseErrorMessage = (err: any): string => {
+  switch (err?.code) {
+    case 'auth/invalid-phone-number':
+      return 'Enter a valid 10-digit Indian mobile number';
+    case 'auth/missing-phone-number':
+      return 'Phone number is required';
+    case 'auth/too-many-requests':
+      return 'Too many attempts from this device. Please try again later.';
+    case 'auth/quota-exceeded':
+      return 'SMS limit reached for today. Please try again later.';
+    case 'auth/invalid-verification-code':
+      return 'Incorrect OTP. Please check and try again.';
+    case 'auth/code-expired':
+      return 'This OTP has expired. Please resend and try again.';
+    case 'auth/captcha-check-failed':
+      return 'Verification check failed. Please refresh the page and try again.';
+    case 'auth/invalid-app-credential':
+      return 'Verification service is temporarily unavailable. Please try again in a moment.';
+    case 'auth/network-request-failed':
+      return 'Network error. Please check your connection and try again.';
+    default:
+      return err?.message || 'Something went wrong. Please try again.';
+  }
+};
+
 // ── Phone step ─────────────────────────────────────────────────
-function PhoneStep({ onSuccess }: { onSuccess: (p: string) => void }) {
+function PhoneStep({
+  onSuccess,
+}: {
+  onSuccess: (phone: string, confirmation: ConfirmationResult) => void;
+}) {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -23,10 +80,32 @@ function PhoneStep({ onSuccess }: { onSuccess: (p: string) => void }) {
     if (!isValid) { setError('Enter a valid 10-digit Indian mobile number'); return; }
     setLoading(true); setError('');
     try {
-      await apiPost('/auth/customer/send-otp', { phone });
+      const appVerifier = getRecaptchaVerifier();
+      // DEBUG — remove before go-live
+      console.log('[Firebase DEBUG] Calling signInWithPhoneNumber', {
+        phone: `+91${phone}`,
+        verifierExists: !!appVerifier,
+        verifierType: appVerifier?.type,
+      });
+      const confirmation = await signInWithPhoneNumber(firebaseAuth, `+91${phone}`, appVerifier);
+      // DEBUG — remove before go-live
+      console.log('[Firebase DEBUG] signInWithPhoneNumber SUCCESS', {
+        confirmationResult: confirmation,
+        verificationId: (confirmation as any)?.verificationId,
+      });
       toast.success(`OTP sent to ${phone.slice(0, 5)}XXXXX`);
-      onSuccess(phone);
-    } catch (err) { setError(getErrorMessage(err)); }
+      onSuccess(phone, confirmation);
+    } catch (err: any) {
+      // DEBUG — remove before go-live
+      console.error('[Firebase DEBUG] signInWithPhoneNumber FAILED', {
+        code: err?.code,
+        message: err?.message,
+        fullError: JSON.stringify(err, Object.getOwnPropertyNames(err)),
+        rawErr: err,
+      });
+      setError(firebaseErrorMessage(err));
+      resetRecaptchaVerifier();
+    }
     finally { setLoading(false); }
   };
 
@@ -60,13 +139,24 @@ function PhoneStep({ onSuccess }: { onSuccess: (p: string) => void }) {
 }
 
 // ── OTP step ───────────────────────────────────────────────────
-function OTPStep({ phone, onBack }: { phone: string; onBack: () => void }) {
+function OTPStep({
+  phone,
+  confirmation,
+  onBack,
+  onResend,
+}: {
+  phone: string;
+  confirmation: ConfirmationResult;
+  onBack: () => void;
+  onResend: () => Promise<ConfirmationResult>;
+}) {
   const router = useRouter();
   const { setUser, setTokens } = useAuthStore();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resendIn, setResendIn] = useState(60);
+  const [confirmationResult, setConfirmationResult] = useState(confirmation);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
@@ -83,7 +173,9 @@ function OTPStep({ phone, onBack }: { phone: string; onBack: () => void }) {
     if (code.length !== 6) return;
     setLoading(true); setError('');
     try {
-      const res = await apiPost<any>('/auth/customer/verify-otp', { phone, otp: code });
+      const credential = await confirmationResult.confirm(code);
+      const idToken = await credential.user.getIdToken();
+      const res = await apiPost<any>('/auth/customer/firebase-login', { id_token: idToken });
       const { user, tokens } = res.data as any;
       tokenStorage.setAccess(tokens.access_token);
       tokenStorage.setRefresh(tokens.refresh_token);
@@ -92,8 +184,8 @@ function OTPStep({ phone, onBack }: { phone: string; onBack: () => void }) {
       toast.success(`Welcome, ${user.full_name?.split(' ')[0] || 'there'}! 👋`);
       const redirect = new URLSearchParams(window.location.search).get('redirect');
       router.replace(redirect || '/dashboard');
-    } catch (err) {
-      setError(getErrorMessage(err));
+    } catch (err: any) {
+      setError(err?.code ? firebaseErrorMessage(err) : getErrorMessage(err));
       setOtp(['', '', '', '', '', '']);
       refs.current[0]?.focus();
     } finally { setLoading(false); }
@@ -120,10 +212,11 @@ function OTPStep({ phone, onBack }: { phone: string; onBack: () => void }) {
   const resend = async () => {
     if (resendIn > 0) return;
     try {
-      await apiPost('/auth/customer/send-otp', { phone });
+      const fresh = await onResend();
+      setConfirmationResult(fresh);
       setResendIn(60); setOtp(['', '', '', '', '', '']);
       toast.success('New OTP sent!');
-    } catch (err) { toast.error(getErrorMessage(err)); }
+    } catch (err: any) { toast.error(firebaseErrorMessage(err)); }
   };
 
   return (
@@ -170,8 +263,23 @@ function OTPStep({ phone, onBack }: { phone: string; onBack: () => void }) {
 
 // ── Page ───────────────────────────────────────────────────────
 export default function LoginPage() {
-  const [step, setStep]   = useState<'phone' | 'otp'>('phone');
+  const [step, setStep] = useState<'phone' | 'otp'>('phone');
   const [phone, setPhone] = useState('');
+  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
+
+  const handlePhoneSuccess = (p: string, conf: ConfirmationResult) => {
+    setPhone(p);
+    setConfirmation(conf);
+    setStep('otp');
+  };
+
+  const handleResend = async (): Promise<ConfirmationResult> => {
+    resetRecaptchaVerifier();
+    const appVerifier = getRecaptchaVerifier();
+    const conf = await signInWithPhoneNumber(firebaseAuth, `+91${phone}`, appVerifier);
+    setConfirmation(conf);
+    return conf;
+  };
 
   return (
     <div className="min-h-screen bg-surface-50 flex">
@@ -216,9 +324,9 @@ export default function LoginPage() {
 
           <div className="bg-white rounded-3xl shadow-card-hover p-8">
             <AnimatePresence mode="wait">
-              {step === 'phone'
-                ? <PhoneStep key="phone" onSuccess={(p) => { setPhone(p); setStep('otp'); }} />
-                : <OTPStep   key="otp"   phone={phone} onBack={() => setStep('phone')} />
+              {step === 'phone' || !confirmation
+                ? <PhoneStep key="phone" onSuccess={handlePhoneSuccess} />
+                : <OTPStep   key="otp"   phone={phone} confirmation={confirmation} onBack={() => setStep('phone')} onResend={handleResend} />
               }
             </AnimatePresence>
           </div>
@@ -231,6 +339,9 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+
+      {/* Invisible reCAPTCHA mount point for Firebase Phone Auth */}
+      <div id="recaptcha-container" />
     </div>
   );
 }

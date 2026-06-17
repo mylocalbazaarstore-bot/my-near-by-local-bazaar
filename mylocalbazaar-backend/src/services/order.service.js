@@ -190,37 +190,50 @@ const OrderService = {
 
       // 1g. Create order record
       const orderNumber = generateOrderNumber();
+
+      // Build the INSERT dynamically so the UPI-Direct-only proof columns
+      // (payment_utr, payment_screenshot_url) are bound ONLY for upi_direct orders.
+      // COD / Razorpay / Wallet orders must not reference these columns at all.
+      const orderColumns = [
+        'order_number', 'user_id', 'merchant_id',
+        'delivery_address', 'area_id', 'is_within_delivery_zone',
+        'subtotal', 'discount_amount', 'coupon_code', 'delivery_charge', 'gst_amount', 'total_amount',
+        'payment_method', 'payment_status', 'order_status', 'notes',
+      ];
+
+      const orderValues = [
+        orderNumber, userId, merchantId,
+        JSON.stringify({               // address snapshot
+          label:         address.label,
+          full_name:     address.full_name,
+          phone:         address.phone,
+          address_line1: address.address_line1,
+          address_line2: address.address_line2,
+          landmark:      address.landmark,
+          pincode:       address.pincode,
+          city:          address.city,
+          state:         address.state,
+          area_name:     address.area_name,
+        }),
+        address.area_id, isWithinZone,
+        subtotal, discountAmount, coupon_code || null,
+        deliveryCharge, gstAmount, totalAmount,
+        payment_method, 'pending', 'payment_pending', notes || null,
+      ];
+
+      // UPI Direct proof columns — appended ONLY for upi_direct
+      if (payment_method === 'upi_direct') {
+        orderColumns.push('payment_utr', 'payment_screenshot_url');
+        orderValues.push(payment_utr || null, payment_screenshot_url || null);
+      }
+
+      const orderPlaceholders = orderValues.map((_, i) => `$${i + 1}`).join(', ');
+
       const { rows: orderRows } = await client.query(
-        `INSERT INTO orders (
-           order_number, user_id, merchant_id,
-           delivery_address, area_id, is_within_delivery_zone,
-           subtotal, discount_amount, coupon_code, delivery_charge, gst_amount, total_amount,
-           payment_method, payment_status, order_status, notes,
-           payment_utr, payment_screenshot_url
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pending','payment_pending',$14,$15,$16)
+        `INSERT INTO orders (${orderColumns.join(', ')})
+         VALUES (${orderPlaceholders})
          RETURNING *`,
-        [
-          orderNumber, userId, merchantId,
-          JSON.stringify({               // address snapshot
-            label:         address.label,
-            full_name:     address.full_name,
-            phone:         address.phone,
-            address_line1: address.address_line1,
-            address_line2: address.address_line2,
-            landmark:      address.landmark,
-            pincode:       address.pincode,
-            city:          address.city,
-            state:         address.state,
-            area_name:     address.area_name,
-          }),
-          address.area_id, isWithinZone,
-          subtotal, discountAmount, coupon_code || null,
-          deliveryCharge, gstAmount, totalAmount,
-          payment_method,
-          notes || null,
-          payment_utr || null,
-          payment_screenshot_url || null,
-        ]
+        orderValues
       );
 
       const order = orderRows[0];
