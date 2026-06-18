@@ -65,6 +65,8 @@ merchantPubRouter.get('/:slug', areaCtrl.getMerchantBySlug);
 // ─────────────────────────────────────────────────────────────
 const productPubRouter = express.Router();
 
+// /slug/:slug must be declared before /:id so it isn't shadowed by the id route
+productPubRouter.get('/slug/:slug', productCtrl.getProductBySlug);
 productPubRouter.get('/:id', productCtrl.getProductById);
 
 // Export all routers so index.js can mount them separately

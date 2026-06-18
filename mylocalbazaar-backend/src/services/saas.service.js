@@ -22,6 +22,11 @@ const { PLAN_LIMITS, PLAN_PRICES } = require('../validators/saas.validator');
 // ── Cache key ─────────────────────────────────────────────────
 const planCacheKey = (merchantId) => `mlb:merchant_plan:${merchantId}`;
 
+// Service-category stores (e.g. Banquet Halls) showcase a venue with many
+// photos, so they get a larger per-product gallery than regular listings,
+// independent of their subscription plan tier.
+const SERVICE_IMAGE_LIMIT = 15;
+
 // ─────────────────────────────────────────────────────────────
 // PLAN INFORMATION
 // ─────────────────────────────────────────────────────────────
@@ -221,10 +226,18 @@ const FeatureGate = {
     return { allowed: true };
   },
 
-  // Check if merchant can upload images (limit per plan)
+  // Check if merchant can upload images (limit per plan / store category)
   canUploadImages: async (merchantId, productId) => {
     const plan = await PlanService.getCurrentPlan(merchantId);
-    const maxImages = plan?.limits?.max_images_per_product || 2;
+    let maxImages = plan?.limits?.max_images_per_product || 2;
+
+    // Banquet Halls and other service stores get a larger photo gallery.
+    const { rows: mrow } = await query(
+      'SELECT store_category FROM merchants WHERE id = $1',
+      [merchantId]
+    );
+    const isServiceStore = mrow[0]?.store_category === 'service';
+    if (isServiceStore) maxImages = Math.max(maxImages, SERVICE_IMAGE_LIMIT);
 
     const { rows } = await query(
       'SELECT COUNT(*) AS cnt FROM product_images WHERE product_id = $1',
@@ -235,8 +248,10 @@ const FeatureGate = {
     if (current >= maxImages) {
       return {
         allowed: false,
-        reason:  `Your ${plan.plan} plan allows ${maxImages} images per product. Upgrade for more.`,
-        upgrade_to: plan.plan === 'free' ? 'basic' : 'pro',
+        reason:  isServiceStore
+          ? `You can upload up to ${maxImages} images per listing.`
+          : `Your ${plan.plan} plan allows ${maxImages} images per product. Upgrade for more.`,
+        upgrade_to: isServiceStore ? undefined : (plan.plan === 'free' ? 'basic' : 'pro'),
       };
     }
 

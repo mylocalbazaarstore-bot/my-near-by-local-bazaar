@@ -186,6 +186,18 @@ const ProductService = {
   },
 
   // ═════════════════════════════════════════════════════════════
+  // READ — Single product by slug (public customer detail page)
+  // ═════════════════════════════════════════════════════════════
+  findBySlug: async (slug) => {
+    const { rows } = await query(
+      `SELECT p.id FROM products p WHERE p.slug = $1 LIMIT 1`,
+      [slug]
+    );
+    if (!rows[0]) return null;
+    return ProductService.findById(rows[0].id);
+  },
+
+  // ═════════════════════════════════════════════════════════════
   // READ — Paginated list for customer storefront (public)
   // ═════════════════════════════════════════════════════════════
   getMerchantProducts: async (merchantId, filters = {}, pagination = {}) => {
@@ -500,14 +512,21 @@ const ProductService = {
     );
     if (!check[0]) throw Object.assign(new Error('Product not found'), { statusCode: 404 });
 
+    // Hard backstop cap (per-plan limit is enforced earlier by FeatureGate).
+    // Service stores (e.g. Banquet Halls) allow a larger venue gallery.
+    const { rows: mrow } = await query(
+      'SELECT store_category FROM merchants WHERE id = $1', [merchantId]
+    );
+    const maxImages = mrow[0]?.store_category === 'service' ? 15 : 8;
+
     // Check how many images already exist
     const { rows: existing } = await query(
       'SELECT COUNT(*) AS cnt FROM product_images WHERE product_id = $1', [productId]
     );
     const existingCount = parseInt(existing[0].cnt);
-    if (existingCount + imageFiles.length > 8) {
+    if (existingCount + imageFiles.length > maxImages) {
       throw Object.assign(
-        new Error(`Maximum 8 images per product. Currently have ${existingCount}.`),
+        new Error(`Maximum ${maxImages} images per product. Currently have ${existingCount}.`),
         { statusCode: 400 }
       );
     }

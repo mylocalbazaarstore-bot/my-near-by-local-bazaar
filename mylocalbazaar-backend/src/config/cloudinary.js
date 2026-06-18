@@ -77,11 +77,13 @@ const documentFilter = (req, file, cb) => {
 };
 
 // ── Pre-configured upload middlewares ─────────────────────────
+// Accepts up to 15 files per request; the effective per-product cap is
+// enforced downstream by FeatureGate (plan- and store_category-aware).
 const uploadProductImage = multer({
   storage:  createStorage(getMerchantProductFolder),
   fileFilter: imageFilter,
   limits:   { fileSize: 5 * 1024 * 1024 }, // 5MB
-}).array('images', 8);
+}).array('images', 15);
 
 const uploadMerchantLogo = multer({
   storage:  createStorage(FOLDERS.merchants),

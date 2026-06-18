@@ -49,4 +49,16 @@ const getProductById = async (req, res) => {
   return success(res, { product }, 'Product details fetched');
 };
 
-module.exports = { getMerchantProducts, getProductById };
+// ── GET /products/slug/:slug ────────────────────────────────────
+// Customer-facing product detail page resolves by slug (SEO-friendly URL).
+const getProductBySlug = async (req, res) => {
+  const product = await ProductService.findBySlug(req.params.slug);
+
+  if (!product || product.product_status !== 'active') {
+    return notFound(res, 'Product not found');
+  }
+
+  return success(res, { product }, 'Product details fetched');
+};
+
+module.exports = { getMerchantProducts, getProductById, getProductBySlug };
