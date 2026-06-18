@@ -45,6 +45,17 @@ export function DashboardLayout({
   const [open, setOpen] = useState(false);
   const { user, logout } = useAuthStore();
 
+  // The session `user` is a customer for role 'customer' and a merchant record
+  // for role 'merchant' — the latter carries owner_name + store_name instead of
+  // full_name, so resolve the display fields per role.
+  const u = user as any;
+  const displayName = role === 'merchant'
+    ? (u?.owner_name || u?.store_name || u?.full_name || 'Merchant')
+    : (u?.full_name || 'User');
+  const subLabel = role === 'merchant'
+    ? (u?.store_name || 'Your Store')
+    : role;
+
   const accent = {
     green:  { bar: 'bg-brand-green',  dot: 'bg-green-500',  ring: 'ring-green-500/20' },
     orange: { bar: 'bg-brand-orange', dot: 'bg-orange-500', ring: 'ring-orange-500/20' },
@@ -74,15 +85,20 @@ export function DashboardLayout({
             'w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-base flex-shrink-0',
             accentColor === 'green' ? 'bg-gradient-to-br from-brand-green to-green-600' : 'bg-gradient-to-br from-brand-orange to-orange-600'
           )}>
-            {user?.full_name?.[0] || '?'}
+            {displayName?.[0]?.toUpperCase() || '?'}
           </div>
           <div className="min-w-0 flex-1">
             <p className="font-bold text-surface-900 text-sm truncate">
-              {user?.full_name || 'User'}
+              {displayName}
             </p>
             <div className="flex items-center gap-1 mt-0.5">
               <span className={clsx('w-1.5 h-1.5 rounded-full', accent.dot)} />
-              <span className="text-[11px] font-semibold text-surface-400 capitalize">{role}</span>
+              <span className={clsx(
+                'text-[11px] font-semibold text-surface-400 truncate',
+                role !== 'merchant' && 'capitalize'
+              )}>
+                {subLabel}
+              </span>
             </div>
           </div>
         </div>

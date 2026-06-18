@@ -11,7 +11,7 @@
 // ─────────────────────────────────────────────────────────────
 
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -24,7 +24,7 @@ import { useMerchantProducts } from '@/hooks/useDashboard';
 import {
   StatusBadge, EmptyState, ConfirmModal, TableSkeleton, Alert,
 } from '@/components/ui/DashboardPrimitives';
-import { api, apiPost, apiGet } from '@/lib/api';
+import { api, apiPost, apiGet, apiPostForm } from '@/lib/api';
 import toast from 'react-hot-toast';
 
 // ── Status filter options ──────────────────────────────────────
@@ -123,9 +123,18 @@ function ProductForm({
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState('');
+  // Image upload state. `images` holds newly picked files (not yet uploaded);
+  // `existingImages` mirrors the product's already-saved images (edit mode).
+  const [images,         setImages]         = useState<File[]>([]);
+  const [existingImages, setExistingImages] = useState<any[]>([]);
+  const [imgBusy,        setImgBusy]        = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const MAX_IMAGES = 8;
 
   useEffect(() => {
     if (!open) return;
+    setImages([]);
+    setExistingImages(editProduct?.images || []);
     if (editProduct) {
       setForm({
         name:           editProduct.name || '',
@@ -146,6 +155,41 @@ function ProductForm({
     setError('');
   }, [open, editProduct]);
 
+  // ── Image helpers ──────────────────────────────────────────
+  const addFiles = (list: FileList | null) => {
+    if (!list) return;
+    const picked = Array.from(list).filter((f) => f.type.startsWith('image/'));
+    const room = MAX_IMAGES - existingImages.length - images.length;
+    if (picked.length > room) {
+      toast.error(`Maximum ${MAX_IMAGES} images per product`);
+    }
+    if (room > 0) setImages((prev) => [...prev, ...picked.slice(0, room)]);
+  };
+
+  const removeStaged = (idx: number) =>
+    setImages((prev) => prev.filter((_, i) => i !== idx));
+
+  const deleteExisting = async (imageId: string) => {
+    if (!editProduct) return;
+    setImgBusy(true);
+    try {
+      await api.delete(`/merchant/products/${editProduct.id}/images/${imageId}`);
+      setExistingImages((prev) => prev.filter((im) => im.id !== imageId));
+      toast.success('Image removed');
+    } catch {
+      toast.error('Failed to remove image');
+    } finally {
+      setImgBusy(false);
+    }
+  };
+
+  const uploadImages = async (productId: string) => {
+    if (!images.length) return;
+    const fd = new FormData();
+    images.forEach((f) => fd.append('images', f));
+    await apiPostForm(`/merchant/products/${productId}/images`, fd);
+  };
+
   const submit = async () => {
     if (!form.name || !form.mrp || !form.retail_price || !form.category_id) {
       setError('Name, category, MRP, and selling price are required.');
@@ -162,13 +206,29 @@ function ProductForm({
         gst_percentage: parseFloat(form.gst_percentage),
         moq:            parseInt(form.moq),
       };
+
+      // 1) Create or update the product record first to obtain its id.
+      let productId: string | undefined = editProduct?.id;
       if (isEdit) {
         await api.put(`/merchant/products/${editProduct.id}`, payload);
-        toast.success('Product updated successfully!');
       } else {
-        await apiPost('/merchant/products', payload);
-        toast.success('Product submitted for approval!');
+        const res = await apiPost<any>('/merchant/products', payload);
+        productId = (res.data as any)?.product?.id;
       }
+
+      // 2) Upload any newly picked images against that product id.
+      if (images.length && productId) {
+        try {
+          await uploadImages(productId);
+        } catch (imgErr: any) {
+          toast.error(
+            imgErr?.response?.data?.message ||
+            'Product saved, but image upload failed — re-try from Edit.'
+          );
+        }
+      }
+
+      toast.success(isEdit ? 'Product updated successfully!' : 'Product submitted for approval!');
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -374,14 +434,68 @@ function ProductForm({
                   <span className="text-sm font-semibold text-surface-700">Returnable (7 days)</span>
                 </label>
 
-                {/* Image upload notice */}
-                <div className="rounded-xl border-2 border-dashed border-surface-200 p-4 text-center bg-surface-50">
-                  <Upload className="w-6 h-6 text-surface-300 mx-auto mb-2" />
-                  <p className="text-xs font-semibold text-surface-500">
-                    Images can be added after product creation
-                  </p>
-                  <p className="text-[11px] text-surface-400 mt-0.5">
-                    Go to Products → Edit → Upload Images
+                {/* Image upload */}
+                <div>
+                  <label className="block text-xs font-bold text-surface-500 uppercase tracking-wider mb-1.5">
+                    Product Images
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {/* Already-saved images (edit mode) */}
+                    {existingImages.map((im) => (
+                      <div key={im.id}
+                           className="relative aspect-square rounded-lg overflow-hidden border border-surface-200">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={im.image_url} alt="" className="object-cover w-full h-full" />
+                        <button
+                          type="button" onClick={() => deleteExisting(im.id)} disabled={imgBusy}
+                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white
+                                     flex items-center justify-center hover:bg-red-500 disabled:opacity-50"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                        {im.is_primary && (
+                          <span className="absolute bottom-0 inset-x-0 bg-brand-green/90 text-white
+                                           text-[9px] font-bold text-center py-0.5">Primary</span>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Newly picked images (not yet uploaded) */}
+                    {images.map((f, idx) => (
+                      <div key={idx}
+                           className="relative aspect-square rounded-lg overflow-hidden border border-brand-green/40">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={URL.createObjectURL(f)} alt="" className="object-cover w-full h-full" />
+                        <button
+                          type="button" onClick={() => removeStaged(idx)}
+                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white
+                                     flex items-center justify-center hover:bg-red-500"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* Add button */}
+                    {existingImages.length + images.length < MAX_IMAGES && (
+                      <button
+                        type="button" onClick={() => fileRef.current?.click()}
+                        className="aspect-square rounded-lg border-2 border-dashed border-surface-300
+                                   flex flex-col items-center justify-center gap-1 text-surface-400
+                                   hover:border-brand-green hover:text-brand-green transition-colors"
+                      >
+                        <Upload className="w-5 h-5" />
+                        <span className="text-[10px] font-bold">Add</span>
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    ref={fileRef} type="file" accept="image/*" multiple className="hidden"
+                    onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }}
+                  />
+                  <p className="text-[11px] text-surface-400 mt-1.5">
+                    Up to {MAX_IMAGES} images (JPG/PNG).
+                    {!isEdit && ' Uploaded right after the product is created.'}
                   </p>
                 </div>
               </div>
