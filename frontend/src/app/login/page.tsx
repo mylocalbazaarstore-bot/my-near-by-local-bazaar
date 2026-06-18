@@ -13,7 +13,7 @@ import {
   type ConfirmationResult,
 } from 'firebase/auth';
 import { apiPost, getErrorMessage, tokenStorage } from '@/lib/api';
-import { firebaseAuth } from '@/lib/firebase';
+import { getFirebaseAuth } from '@/lib/firebase';
 import { useAuthStore } from '@/store/authStore';
 import toast from 'react-hot-toast';
 
@@ -24,7 +24,7 @@ let recaptchaVerifier: RecaptchaVerifier | null = null;
 
 const getRecaptchaVerifier = (): RecaptchaVerifier => {
   if (!recaptchaVerifier) {
-    recaptchaVerifier = new RecaptchaVerifier(firebaseAuth, 'recaptcha-container', {
+    recaptchaVerifier = new RecaptchaVerifier(getFirebaseAuth(), 'recaptcha-container', {
       size: 'invisible',
     });
   }
@@ -87,7 +87,7 @@ function PhoneStep({
         verifierExists: !!appVerifier,
         verifierType: appVerifier?.type,
       });
-      const confirmation = await signInWithPhoneNumber(firebaseAuth, `+91${phone}`, appVerifier);
+      const confirmation = await signInWithPhoneNumber(getFirebaseAuth(), `+91${phone}`, appVerifier);
       // DEBUG — remove before go-live
       console.log('[Firebase DEBUG] signInWithPhoneNumber SUCCESS', {
         confirmationResult: confirmation,
@@ -276,7 +276,7 @@ export default function LoginPage() {
   const handleResend = async (): Promise<ConfirmationResult> => {
     resetRecaptchaVerifier();
     const appVerifier = getRecaptchaVerifier();
-    const conf = await signInWithPhoneNumber(firebaseAuth, `+91${phone}`, appVerifier);
+    const conf = await signInWithPhoneNumber(getFirebaseAuth(), `+91${phone}`, appVerifier);
     setConfirmation(conf);
     return conf;
   };
