@@ -25,16 +25,19 @@ const INPUT_CLS = 'w-full rounded-xl border-2 border-surface-200 bg-white px-4 p
   'text-sm text-surface-900 placeholder-surface-400 focus:outline-none ' +
   'focus:border-[#1E3A8A] transition-colors';
 
-// ── Store category labels (static — store_category ENUM has 10 values) ──
+// ── Store category labels (static — must mirror the store_category ENUM,
+// the backend Joi allowlist, and the customer Homepage categories: 12 values) ──
 const STORE_CATEGORY_LABELS: Record<string, string> = {
   grocery_fmcg:       'Grocery & FMCG',
   wholesale:          'Wholesale',
   electronics:        'Electronics',
   hardware:           'Hardware',
+  furniture:          'Furniture Store',
   clothing:           'Clothing & Fashion',
   medical:            'Medical & Pharmacy',
   food_tea_stall:     'Food — Tea Stall',
   food_chaat_chinese: 'Food — Chaat/Chinese',
+  food_restaurant:    'Restaurant',
   specialty:          'Specialty Store',
   service:            'Services',
 };
@@ -44,10 +47,12 @@ const STORE_CATEGORIES: { value: string; label: string; emoji: string }[] = [
   { value: 'wholesale',          label: STORE_CATEGORY_LABELS.wholesale,          emoji: '📦' },
   { value: 'electronics',        label: STORE_CATEGORY_LABELS.electronics,        emoji: '📱' },
   { value: 'hardware',           label: STORE_CATEGORY_LABELS.hardware,           emoji: '🔨' },
+  { value: 'furniture',          label: STORE_CATEGORY_LABELS.furniture,          emoji: '🪑' },
   { value: 'clothing',           label: STORE_CATEGORY_LABELS.clothing,           emoji: '👕' },
   { value: 'medical',            label: STORE_CATEGORY_LABELS.medical,            emoji: '💊' },
   { value: 'food_tea_stall',     label: STORE_CATEGORY_LABELS.food_tea_stall,     emoji: '☕' },
   { value: 'food_chaat_chinese', label: STORE_CATEGORY_LABELS.food_chaat_chinese, emoji: '🍜' },
+  { value: 'food_restaurant',    label: STORE_CATEGORY_LABELS.food_restaurant,    emoji: '🍽️' },
   { value: 'specialty',          label: STORE_CATEGORY_LABELS.specialty,          emoji: '✨' },
   { value: 'service',            label: STORE_CATEGORY_LABELS.service,            emoji: '🛎️' },
 ];
