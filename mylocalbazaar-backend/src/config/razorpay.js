@@ -74,12 +74,21 @@ const verifyPaymentSignature = ({ razorpayOrderId, razorpayPaymentId, razorpaySi
 
 // ── Verify Webhook Signature ───────────────────────────────────
 // Called for Razorpay webhook events
-const verifyWebhookSignature = (body, signature) => {
+const verifyWebhookSignature = (rawBody, signature) => {
+  if (!rawBody || !signature || !process.env.RAZORPAY_WEBHOOK_SECRET) return false;
+
+  const payload = Buffer.isBuffer(rawBody)
+    ? rawBody
+    : Buffer.from(typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody));
+
   const expectedSignature = crypto
     .createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET)
-    .update(JSON.stringify(body))
+    .update(payload)
     .digest('hex');
-  return expectedSignature === signature;
+
+  const expected = Buffer.from(expectedSignature);
+  const received = Buffer.from(signature);
+  return expected.length === received.length && crypto.timingSafeEqual(expected, received);
 };
 
 // ── Initiate Refund ───────────────────────────────────────────

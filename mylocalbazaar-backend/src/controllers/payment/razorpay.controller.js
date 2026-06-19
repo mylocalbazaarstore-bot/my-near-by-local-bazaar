@@ -39,7 +39,7 @@ const razorpayWebhook = async (req, res) => {
 
   try {
     // Verify webhook signature
-    if (!verifyWebhookSignature(req.body, signature)) {
+    if (!verifyWebhookSignature(req.rawBody, signature)) {
       logger.warn('Razorpay webhook: invalid signature', { signature });
       return;
     }

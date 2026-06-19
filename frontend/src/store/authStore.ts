@@ -8,6 +8,17 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { User } from '@/types';
 
+const noopStorage = {
+  getItem:    (_name: string) => null,
+  setItem:    (_name: string, _value: string) => undefined,
+  removeItem: (_name: string) => undefined,
+};
+
+const getAuthStorage = () =>
+  typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
+    ? window.localStorage
+    : noopStorage;
+
 interface AuthState {
   user:          User | null;
   role:          'customer' | 'merchant' | 'admin' | null;
@@ -46,14 +57,16 @@ export const useAuthStore = create<AuthState>()(
       decrementCart: () => set((s) => ({ cartCount: Math.max(0, s.cartCount - 1) })),
       setHydrated:   () => set({ isHydrated: true }),
       logout: () => {
-        localStorage.removeItem('mlb_access_token');
-        localStorage.removeItem('mlb_refresh_token');
+        if (typeof window !== 'undefined' && typeof window.localStorage !== 'undefined') {
+          window.localStorage.removeItem('mlb_access_token');
+          window.localStorage.removeItem('mlb_refresh_token');
+        }
         set({ user: null, role: null, accessToken: null, refreshToken: null, cartCount: 0 });
       },
     }),
     {
       name:    'mlb-auth',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(getAuthStorage),
       partialize: (s) => ({
         user:         s.user,
         role:         s.role,

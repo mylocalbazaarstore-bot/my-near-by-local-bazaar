@@ -9,6 +9,8 @@ import axios, {
 } from 'axios';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+const hasBrowserStorage = () =>
+  typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
 export const api: AxiosInstance = axios.create({
   baseURL:         BASE_URL,
@@ -22,8 +24,8 @@ export const api: AxiosInstance = axios.create({
 
 // ── Request interceptor: attach JWT ───────────────────────────
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('mlb_access_token');
+  if (hasBrowserStorage()) {
+    const token = window.localStorage.getItem('mlb_access_token');
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -38,22 +40,23 @@ api.interceptors.response.use(
     const originalRequest = error.config;
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
+      if (!hasBrowserStorage()) return Promise.reject(error);
       try {
-        const refreshToken = localStorage.getItem('mlb_refresh_token');
+        const refreshToken = window.localStorage.getItem('mlb_refresh_token');
         if (!refreshToken) throw new Error('No refresh token');
 
         const { data } = await axios.post(`${BASE_URL}/auth/customer/refresh`, {
           refresh_token: refreshToken,
         });
 
-        localStorage.setItem('mlb_access_token',  data.data.tokens.access_token);
-        localStorage.setItem('mlb_refresh_token', data.data.tokens.refresh_token);
+        window.localStorage.setItem('mlb_access_token',  data.data.tokens.access_token);
+        window.localStorage.setItem('mlb_refresh_token', data.data.tokens.refresh_token);
 
         originalRequest.headers.Authorization = `Bearer ${data.data.tokens.access_token}`;
         return api(originalRequest);
       } catch {
-        localStorage.removeItem('mlb_access_token');
-        localStorage.removeItem('mlb_refresh_token');
+        window.localStorage.removeItem('mlb_access_token');
+        window.localStorage.removeItem('mlb_refresh_token');
         window.location.href = '/login';
       }
     }
@@ -73,13 +76,18 @@ export interface PaginationMeta {
 // Centralises the localStorage keys so they stay in sync with the
 // request interceptor above (which reads 'mlb_access_token').
 export const tokenStorage = {
-  setAccess:  (token: string) => localStorage.setItem('mlb_access_token',  token),
-  setRefresh: (token: string) => localStorage.setItem('mlb_refresh_token', token),
-  getAccess:  ()              => localStorage.getItem('mlb_access_token'),
-  getRefresh: ()              => localStorage.getItem('mlb_refresh_token'),
+  setAccess:  (token: string) => {
+    if (hasBrowserStorage()) window.localStorage.setItem('mlb_access_token', token);
+  },
+  setRefresh: (token: string) => {
+    if (hasBrowserStorage()) window.localStorage.setItem('mlb_refresh_token', token);
+  },
+  getAccess:  () => (hasBrowserStorage() ? window.localStorage.getItem('mlb_access_token') : null),
+  getRefresh: () => (hasBrowserStorage() ? window.localStorage.getItem('mlb_refresh_token') : null),
   clear:      ()              => {
-    localStorage.removeItem('mlb_access_token');
-    localStorage.removeItem('mlb_refresh_token');
+    if (!hasBrowserStorage()) return;
+    window.localStorage.removeItem('mlb_access_token');
+    window.localStorage.removeItem('mlb_refresh_token');
   },
 };
 

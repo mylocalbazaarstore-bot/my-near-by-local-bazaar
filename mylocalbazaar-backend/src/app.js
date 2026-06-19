@@ -57,7 +57,8 @@ app.set('trust proxy', 2);
 app.use('/api/v1/payments/webhook/razorpay',
   express.raw({ type: 'application/json' }),
   (req, res, next) => {
-    try { req.body = JSON.parse(req.body.toString()); } catch { /* invalid */ }
+    req.rawBody = req.body;
+    try { req.body = JSON.parse(req.rawBody.toString('utf8')); } catch { req.body = {}; }
     next();
   }
 );

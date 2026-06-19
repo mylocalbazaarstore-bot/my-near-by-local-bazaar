@@ -141,27 +141,41 @@ const sendCampaign = async (req, res) => {
   let customerTokens = [];
 
   if (target_role === 'all' || target_role === 'customer') {
+    const customerParams = [];
+    const customerFilters = ['u.is_active = true', 'u.is_blocked = false'];
+    if (target_area_id) {
+      customerParams.push(target_area_id);
+      customerFilters.push(`EXISTS (
+         SELECT 1 FROM user_addresses ua
+         WHERE ua.user_id = u.id AND ua.area_id = $${customerParams.length}
+       )`);
+    }
+
     const { rows } = await query(
       `SELECT u.phone, us.device_info->>'fcm_token' AS fcm_token
        FROM users u
        LEFT JOIN user_sessions us ON us.user_id = u.id AND us.user_role = 'customer'
-       WHERE u.is_active = true AND u.is_blocked = false
-       ${target_area_id ? `AND EXISTS (
-         SELECT 1 FROM user_addresses ua
-         WHERE ua.user_id = u.id AND ua.area_id = '${target_area_id}'
-       )` : ''}
-       LIMIT 5000`
+       WHERE ${customerFilters.join(' AND ')}
+       LIMIT 5000`,
+      customerParams
     );
     customerPhones = rows.map((r) => r.phone).filter(Boolean);
     customerTokens = rows.map((r) => r.fcm_token).filter(Boolean);
   }
 
   if (target_role === 'all' || target_role === 'merchant') {
+    const merchantParams = [];
+    const merchantFilters = ["merchant_status = 'active'"];
+    if (target_category) {
+      merchantParams.push(target_category);
+      merchantFilters.push(`store_category = $${merchantParams.length}`);
+    }
+
     const { rows } = await query(
       `SELECT phone FROM merchants
-       WHERE merchant_status = 'active'
-       ${target_category ? `AND store_category = '${target_category}'` : ''}
-       LIMIT 2000`
+       WHERE ${merchantFilters.join(' AND ')}
+       LIMIT 2000`,
+      merchantParams
     );
     merchantPhones = rows.map((r) => r.phone).filter(Boolean);
   }

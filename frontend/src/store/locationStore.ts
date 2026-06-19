@@ -9,6 +9,17 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
+const noopStorage = {
+  getItem:    (_name: string) => null,
+  setItem:    (_name: string, _value: string) => undefined,
+  removeItem: (_name: string) => undefined,
+};
+
+const getLocationStorage = () =>
+  typeof window !== 'undefined' && typeof window.localStorage !== 'undefined'
+    ? window.localStorage
+    : noopStorage;
+
 export interface LocationState {
   areaId:   string | null;
   areaName: string | null;
@@ -34,7 +45,7 @@ export const useLocationStore = create<LocationState>()(
     }),
     {
       name:    'mlb_location',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(getLocationStorage),
     }
   )
 );

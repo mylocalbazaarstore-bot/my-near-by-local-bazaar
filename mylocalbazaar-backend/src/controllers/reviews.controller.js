@@ -39,13 +39,27 @@ const submitReview = async (req, res) => {
   }
 
   // Prevent duplicate reviews on same entity
-  const existingCheck = product_id
-    ? `product_id = '${product_id}' AND user_id = '${userId}'`
-    : `merchant_id = '${merchant_id}' AND user_id = '${userId}'`;
+  let entityColumn;
+  let entityId;
+  if (product_id) {
+    entityColumn = 'product_id';
+    entityId = product_id;
+  } else if (merchant_id) {
+    entityColumn = 'merchant_id';
+    entityId = merchant_id;
+  } else {
+    entityColumn = 'service_id';
+    entityId = service_id;
+  }
 
   const { rows: existing } = await query(
-    `SELECT id FROM reviews WHERE ${existingCheck} AND (order_id = $1 OR order_id IS NULL) LIMIT 1`,
-    [order_id || null]
+    `SELECT id
+     FROM reviews
+     WHERE user_id = $1
+       AND ${entityColumn} = $2
+       AND (order_id = $3 OR order_id IS NULL)
+     LIMIT 1`,
+    [userId, entityId, order_id || null]
   );
   if (existing[0]) {
     return conflict(res, 'You have already submitted a review for this item');

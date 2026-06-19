@@ -5,7 +5,9 @@
 // ─────────────────────────────────────────────────────────────
 
 const express    = require('express');
+const Joi        = require('joi');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
+const { validate, fields } = require('../middlewares/validate.middleware');
 const {
   submitReview, getProductReviews, getMerchantReviews, getMyReviews, deleteReview,
   walletController,
@@ -17,11 +19,27 @@ const {
 // ═══════════════════════════════════════════════════════════════
 const reviewRouter = express.Router();
 
+const submitReviewSchema = Joi.object({
+  product_id:  fields.uuid.optional().allow(null),
+  merchant_id: fields.uuid.optional().allow(null),
+  service_id:  fields.uuid.optional().allow(null),
+  order_id:    fields.uuid.optional().allow(null),
+  booking_id:  fields.uuid.optional().allow(null),
+  rating:      Joi.number().integer().min(1).max(5).required(),
+  title:       Joi.string().trim().max(120).optional().allow('', null),
+  body:        Joi.string().trim().max(1000).optional().allow('', null),
+}).custom((value, helpers) => {
+  if (!value.product_id && !value.merchant_id && !value.service_id) {
+    return helpers.message('Provide at least one of product_id, merchant_id, or service_id');
+  }
+  return value;
+});
+
 reviewRouter.get('/product/:productId',   getProductReviews);
 reviewRouter.get('/merchant/:merchantId', getMerchantReviews);
 reviewRouter.use(authenticate);
 reviewRouter.get('/my',                   getMyReviews);
-reviewRouter.post('/',                    authorize('customer'), submitReview);
+reviewRouter.post('/',                    authorize('customer'), validate(submitReviewSchema), submitReview);
 reviewRouter.delete('/:id',               authorize('customer'), deleteReview);
 
 // ═══════════════════════════════════════════════════════════════
