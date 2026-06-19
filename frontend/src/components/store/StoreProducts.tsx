@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Search, ShoppingCart, Package, Star, Clock } from 'lucide-react';
@@ -57,6 +58,7 @@ function StoreProductCard({
   const discount = mrp > retail ? Math.round(((mrp - retail) / mrp) * 100) : 0;
   const inStock  = Number(product.stock_quantity) > 0;
   const moq      = Number(product.moq) || 1;
+  const productHref = product.slug ? `/products/${encodeURIComponent(product.slug)}` : null;
 
   const performAdd = async () => {
     setAdding(true);
@@ -98,7 +100,16 @@ function StoreProductCard({
         animate={{ opacity: 1, y: 0 }}
         className="card group flex flex-col overflow-hidden"
       >
-        <div className="relative aspect-square bg-surface-50 overflow-hidden">
+        <Link
+          href={productHref || '#'}
+          aria-label={`View ${product.name} image gallery`}
+          aria-disabled={!productHref}
+          tabIndex={productHref ? 0 : -1}
+          className={clsx(
+            'relative block aspect-square bg-surface-50 overflow-hidden',
+            productHref ? 'cursor-pointer' : 'pointer-events-none'
+          )}
+        >
           {product.primary_image ? (
             <Image
               src={product.primary_image}
@@ -132,7 +143,7 @@ function StoreProductCard({
               </span>
             </div>
           )}
-        </div>
+        </Link>
 
         <div className="p-3 flex flex-col flex-1">
           {product.category_name && (
@@ -141,9 +152,18 @@ function StoreProductCard({
             </p>
           )}
 
-          <h3 className="text-sm font-bold text-surface-900 line-clamp-2 leading-tight mb-1">
-            {product.name}
-          </h3>
+          {productHref ? (
+            <Link
+              href={productHref}
+              className="text-sm font-bold text-surface-900 hover:text-brand-green line-clamp-2 leading-tight mb-1 transition-colors"
+            >
+              {product.name}
+            </Link>
+          ) : (
+            <h3 className="text-sm font-bold text-surface-900 line-clamp-2 leading-tight mb-1">
+              {product.name}
+            </h3>
+          )}
 
           {product.short_description ? (
             <p className="text-xs text-surface-500 line-clamp-2 mb-2 flex-1">

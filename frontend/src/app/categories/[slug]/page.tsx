@@ -33,6 +33,7 @@ function ProductCard({ product }: { product: any }) {
   const discount     = mrp > retail ? Math.round(((mrp - retail) / mrp) * 100) : 0;
   const inStock      = Number(product.stock_quantity) > 0;
   const moq          = Number(product.moq) || 1;
+  const productHref  = product.slug ? `/products/${encodeURIComponent(product.slug)}` : null;
 
   const handleAdd = async () => {
     if (!user) {
@@ -59,7 +60,16 @@ function ProductCard({ product }: { product: any }) {
       className="card group flex flex-col overflow-hidden"
     >
       {/* Image */}
-      <div className="relative aspect-square bg-surface-50 overflow-hidden">
+      <Link
+        href={productHref || '#'}
+        aria-label={`View ${product.name} image gallery`}
+        aria-disabled={!productHref}
+        tabIndex={productHref ? 0 : -1}
+        className={clsx(
+          'relative block aspect-square bg-surface-50 overflow-hidden',
+          productHref ? 'cursor-pointer' : 'pointer-events-none'
+        )}
+      >
         {product.primary_image ? (
           <Image
             src={product.primary_image}
@@ -94,7 +104,7 @@ function ProductCard({ product }: { product: any }) {
             </span>
           </div>
         )}
-      </div>
+      </Link>
 
       {/* Content */}
       <div className="p-3 flex flex-col flex-1">
@@ -102,9 +112,18 @@ function ProductCard({ product }: { product: any }) {
           {product.store_name}
         </p>
 
-        <h3 className="text-sm font-bold text-surface-900 line-clamp-2 leading-tight flex-1 mb-2">
-          {product.name}
-        </h3>
+        {productHref ? (
+          <Link
+            href={productHref}
+            className="text-sm font-bold text-surface-900 hover:text-brand-green line-clamp-2 leading-tight flex-1 mb-2 transition-colors"
+          >
+            {product.name}
+          </Link>
+        ) : (
+          <h3 className="text-sm font-bold text-surface-900 line-clamp-2 leading-tight flex-1 mb-2">
+            {product.name}
+          </h3>
+        )}
 
         {/* Rating */}
         {Number(product.merchant_rating) > 0 && (
