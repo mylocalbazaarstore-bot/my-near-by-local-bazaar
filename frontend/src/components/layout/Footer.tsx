@@ -221,10 +221,10 @@ export default function Footer() {
               Book Services
             </h4>
             <div className="space-y-1">
-              <FooterLink href="/categories/doctor-booking">👨‍⚕️ Doctor Booking</FooterLink>
-              <FooterLink href="/categories/mens-salon">💈 Men's Salon</FooterLink>
-              <FooterLink href="/categories/womens-salon">💅 Women's Salon</FooterLink>
-              <FooterLink href="/categories/home-services">🔨 Home Services</FooterLink>
+              <FooterLink href="/services/doctor-booking">👨‍⚕️ Doctor Booking</FooterLink>
+              <FooterLink href="/services/mens-salon">💈 Men's Salon</FooterLink>
+              <FooterLink href="/services/womens-salon">💅 Women's Salon</FooterLink>
+              <FooterLink href="/services/home-services">🔨 Home Services</FooterLink>
               <FooterLink href="/categories/tea-stall">☕ Tea Stall</FooterLink>
               <FooterLink href="/categories/chaat-chinese">🍜 Chaat & Chinese</FooterLink>
             </div>

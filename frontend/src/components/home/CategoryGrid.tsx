@@ -18,7 +18,7 @@ const SHOP_SLUGS = [
   'medical', 'tea-stall', 'chaat-chinese', 'jewellery', 'restaurant', 'furniture',
 ];
 const SERVICE_SLUGS = [
-  'doctor-booking', 'home-services', 'mens-salon', 'womens-salon', 'banquet-hall',
+  'doctor-booking', 'home-services', 'mens-salon', 'womens-salon',
 ];
 
 // ── Individual Category Card ───────────────────────────────────
@@ -27,11 +27,13 @@ function CategoryCard({
   index,
   count,
   cta = 'Shop Now',
+  href,
 }: {
   cat: CategoryUIConfig;
   index: number;
   count?: number;
   cta?: string;
+  href?: string;
 }) {
   return (
     <motion.div
@@ -41,7 +43,7 @@ function CategoryCard({
       transition={{ duration: 0.4, delay: index * 0.04, ease: [0.16, 1, 0.3, 1] }}
     >
       <Link
-        href={`/categories/${cat.slug}`}
+        href={href || `/categories/${cat.slug}`}
         className="group block relative overflow-hidden rounded-2xl
                    border border-white/60 shadow-card
                    hover:shadow-card-hover hover:-translate-y-1
@@ -315,6 +317,7 @@ export default function CategoryGrid() {
               index={i}
               count={getCount(cat.slug)}
               cta="Book Now"
+              href={`/services/${cat.slug}`}
             />
           ))}
         </div>
