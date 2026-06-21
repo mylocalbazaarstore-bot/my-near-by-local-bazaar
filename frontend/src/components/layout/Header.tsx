@@ -429,10 +429,10 @@ export default function Header() {
               ['/categories/grocery-fmcg', '🛒 Grocery'],
               ['/categories/electronics', '📱 Electronics'],
               ['/categories/medical', '💊 Medical'],
-              ['/categories/doctor-booking', '👨‍⚕️ Doctor'],
-              ['/categories/mens-salon', '💈 Men\'s Salon'],
-              ['/categories/womens-salon', '💅 Women\'s Salon'],
-              ['/categories/home-services', '🔨 Home Services'],
+              ['/services/doctor-booking', '👨‍⚕️ Doctor'],
+              ['/services/mens-salon', '💈 Men\'s Salon'],
+              ['/services/womens-salon', '💅 Women\'s Salon'],
+              ['/services/home-services', '🔨 Home Services'],
               ['/categories/food', '🍜 Food'],
             ].map(([href, label]) => (
               <Link

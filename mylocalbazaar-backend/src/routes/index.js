@@ -12,6 +12,7 @@ const router  = express.Router();
 const { generalLimiter }        = require('../middlewares/rateLimiter.middleware');
 const { healthCheck: dbHealth } = require('../config/db');
 const { redis }                 = require('../config/redis');
+const appointmentRoutes         = require('./appointment.routes');
 
 // ─────────────────────────────────────────────────────────────
 // HEALTH CHECK  GET /api/v1/health
@@ -52,6 +53,12 @@ const { areaRouter, merchantPubRouter, productPubRouter } = require('./area.rout
 router.use('/areas',     areaRouter);
 router.use('/merchants', merchantPubRouter);
 router.use('/products',  productPubRouter);
+
+// Appointment booking (Services | Providers | Slots | Bookings)
+router.use('/services',          appointmentRoutes.servicesRouter);
+router.use('/service-providers', appointmentRoutes.providersRouter);
+router.use('/slots',             appointmentRoutes.slotsRouter);
+router.use('/bookings',          appointmentRoutes.bookingsRouter);
 
 // Goal 1.4 — Merchant Product Management
 router.use('/merchant/products',  require('./product.routes'));
