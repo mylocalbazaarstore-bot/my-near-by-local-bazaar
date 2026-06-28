@@ -413,7 +413,8 @@ const OrderService = {
         `SELECT o.*, p.id AS payment_record_id
          FROM orders o
          LEFT JOIN payments p ON p.order_id = o.id
-         WHERE o.id = $1 AND o.user_id = $2`,
+         WHERE o.id = $1 AND o.user_id = $2
+         FOR UPDATE OF o`,
         [order_id, userId]
       );
 
@@ -504,7 +505,7 @@ const OrderService = {
     return withTransaction(async (client) => {
 
       const { rows } = await client.query(
-        `SELECT * FROM orders WHERE id = $1 AND merchant_id = $2 AND order_status = 'payment_processed'`,
+        `SELECT * FROM orders WHERE id = $1 AND merchant_id = $2 AND order_status = 'payment_processed' FOR UPDATE`,
         [orderId, merchantId]
       );
 
@@ -585,7 +586,7 @@ const OrderService = {
     return withTransaction(async (client) => {
 
       const { rows } = await client.query(
-        'SELECT * FROM orders WHERE id = $1 AND merchant_id = $2',
+        'SELECT * FROM orders WHERE id = $1 AND merchant_id = $2 FOR UPDATE',
         [orderId, merchantId]
       );
 
@@ -660,7 +661,7 @@ const OrderService = {
   adminOverride: async (adminId, orderId, { target_status, note }) => {
     return withTransaction(async (client) => {
       const { rows } = await client.query(
-        'SELECT * FROM orders WHERE id = $1', [orderId]
+        'SELECT * FROM orders WHERE id = $1 FOR UPDATE', [orderId]
       );
       const order = rows[0];
       if (!order) throw Object.assign(new Error('Order not found'), { statusCode: 404 });

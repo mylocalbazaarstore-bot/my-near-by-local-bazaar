@@ -2,10 +2,31 @@
 // ─────────────────────────────────────────────────────────────
 // Rate Limiting — MyLocalBazaar.store
 // Different limits for: general | auth | OTP | admin | uploads
+//
+// Counters are stored in REDIS (rate-limit-redis) so the limits are
+// shared across all instances and survive deploys/restarts. Without a
+// shared store, express-rate-limit keeps counters in per-process memory,
+// which on Railway (multiple instances + frequent deploys) effectively
+// weakens every limit.
 // ─────────────────────────────────────────────────────────────
 
 const rateLimit = require('express-rate-limit');
 const logger    = require('../config/logger');
+const { getClient } = require('../config/redis');
+
+// rate-limit-redis ships as ESM; support named/default/object export shapes.
+const RedisStoreImport = require('rate-limit-redis');
+const RedisStore = RedisStoreImport.RedisStore || RedisStoreImport.default || RedisStoreImport;
+
+// Build a Redis-backed store with a per-limiter key prefix.
+// sendCommand lazily resolves the shared node-redis v4 client.
+const makeStore = (label) => new RedisStore({
+  prefix: `mlb:rl:${label}:`,
+  sendCommand: async (...args) => {
+    const client = await getClient();
+    return client.sendCommand(args);
+  },
+});
 
 const makeHandler = (label) => (req, res) => {
   logger.warn(`Rate limit hit: ${label}`, { ip: req.ip, path: req.path });
@@ -23,7 +44,8 @@ const generalLimiter = rateLimit({
   max:      parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
   standardHeaders: true,
   legacyHeaders:   false,
-  handler: makeHandler('general'),
+  store:    makeStore('general'),
+  handler:  makeHandler('general'),
 });
 
 // ── Auth endpoints (login/register) — stricter ────────────────
@@ -33,7 +55,8 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders:   false,
   skipSuccessfulRequests: true,  // Only count failed attempts
-  handler: makeHandler('auth'),
+  store:    makeStore('auth'),
+  handler:  makeHandler('auth'),
 });
 
 // ── OTP requests — very strict ────────────────────────────────
@@ -43,7 +66,8 @@ const otpLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders:   false,
   keyGenerator: (req) => req.body?.phone || req.ip,
-  handler: makeHandler('otp'),
+  store:    makeStore('otp'),
+  handler:  makeHandler('otp'),
 });
 
 // ── Admin panel — strictest ───────────────────────────────────
@@ -52,14 +76,16 @@ const adminLimiter = rateLimit({
   max:      30,
   standardHeaders: true,
   legacyHeaders:   false,
-  handler: makeHandler('admin'),
+  store:    makeStore('admin'),
+  handler:  makeHandler('admin'),
 });
 
 // ── File upload limiter ───────────────────────────────────────
 const uploadLimiter = rateLimit({
   windowMs: 60 * 1000,    // 1 minute
   max:      20,
-  handler: makeHandler('upload'),
+  store:    makeStore('upload'),
+  handler:  makeHandler('upload'),
 });
 
 module.exports = { generalLimiter, authLimiter, otpLimiter, adminLimiter, uploadLimiter };

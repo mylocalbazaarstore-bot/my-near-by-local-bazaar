@@ -34,16 +34,13 @@ const notify = async (recipientId, recipientType, type, title, body, data = {}) 
 const razorpayWebhook = async (req, res) => {
   const signature = req.headers['x-razorpay-signature'];
 
-  // Always respond 200 immediately to Razorpay (prevents retry storms)
-  res.status(200).json({ received: true });
+  // 1) Verify signature FIRST — reject forged/tampered calls before any DB work
+  if (!verifyWebhookSignature(req.rawBody, signature)) {
+    logger.warn('Razorpay webhook: invalid signature', { signature });
+    return res.status(400).json({ received: false, error: 'invalid_signature' });
+  }
 
   try {
-    // Verify webhook signature
-    if (!verifyWebhookSignature(req.rawBody, signature)) {
-      logger.warn('Razorpay webhook: invalid signature', { signature });
-      return;
-    }
-
     const event   = req.body.event;
     const payload = req.body.payload;
 
@@ -182,6 +179,11 @@ const razorpayWebhook = async (req, res) => {
         );
 
         if (!payRows[0]) break;
+        // Idempotency: ignore duplicate refund webhooks (Razorpay may retry on non-2xx)
+        if (payRows[0].payment_status === 'refunded') {
+          logger.info('Webhook: refund already processed, skipping', { paymentId });
+          break;
+        }
 
         await query(
           `UPDATE payments
@@ -216,9 +218,13 @@ const razorpayWebhook = async (req, res) => {
       default:
         logger.debug('Unhandled Razorpay event', { event });
     }
+
+    // Processed OK → acknowledge so Razorpay stops retrying
+    return res.status(200).json({ received: true });
   } catch (err) {
     logger.error('Razorpay webhook processing error:', { message: err.message, stack: err.stack });
-    // Don't rethrow — response already sent
+    // Non-2xx → Razorpay will retry later. The idempotency guards above make retries safe.
+    return res.status(500).json({ received: false });
   }
 };
 
