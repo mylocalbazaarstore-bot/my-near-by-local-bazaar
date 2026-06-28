@@ -70,11 +70,12 @@ const AdminAnalyticsService = {
         FROM merchants`
       ),
 
-      // Platform revenue (commission)
+      // Platform revenue (order commission). Subscription-only model → 0% by default;
+      // real platform revenue comes from SaaS subscription fees, tracked separately.
       query(`
         SELECT
           COALESCE(
-            SUM(total_amount * ${parseFloat(process.env.PLATFORM_COMMISSION_PERCENT || 8) / 100})
+            SUM(total_amount * ${parseFloat(process.env.PLATFORM_COMMISSION_PERCENT || 0) / 100})
             FILTER (WHERE order_status = 'delivered' AND created_at >= ${since}), 0
           ) AS platform_revenue,
           COALESCE(
@@ -161,7 +162,7 @@ const AdminAnalyticsService = {
 
     const since     = PERIOD_SQL[period] || PERIOD_SQL.month;
     const trunc     = GROUP_TRUNC[groupBy] || 'day';
-    const commPct   = parseFloat(process.env.PLATFORM_COMMISSION_PERCENT || 8) / 100;
+    const commPct   = parseFloat(process.env.PLATFORM_COMMISSION_PERCENT || 0) / 100;  // subscription-only → 0%
 
     const { rows } = await query(`
       SELECT

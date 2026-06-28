@@ -237,27 +237,68 @@ const respondToReturn = async (req, res) => {
     [action === 'approve' ? 'return_approved' : 'return_rejected', returnReq.order_id]
   );
 
-  // Trigger refund if approved
+  // Trigger refund if approved — route by how the customer actually paid
   if (action === 'approve' && refund_amount) {
+    const refundAmt = parseFloat(refund_amount);
+
+    // 1) Razorpay — platform-held online funds → refund via gateway
     const { rows: payRows } = await query(
-      `SELECT razorpay_payment_id FROM payments WHERE order_id = $1 AND payment_status = 'captured'`,
+      `SELECT razorpay_payment_id FROM payments
+       WHERE order_id = $1 AND payment_status = 'captured' AND razorpay_payment_id IS NOT NULL`,
       [returnReq.order_id]
     );
+
     if (payRows[0]?.razorpay_payment_id) {
       try {
         const { initiateRefund } = require('../../config/razorpay');
         await initiateRefund({
           paymentId: payRows[0].razorpay_payment_id,
-          amount:    parseFloat(refund_amount),
+          amount:    refundAmt,
           notes:     { return_request_id: rid },
         });
         await query(
-          `UPDATE orders SET order_status = 'refund_initiated' WHERE id = $1`,
+          `UPDATE orders SET order_status = 'refund_initiated', updated_at = NOW() WHERE id = $1`,
           [returnReq.order_id]
         );
       } catch (err) {
         logger.error('Return refund failed:', { returnId: rid, error: err.message });
       }
+
+    // 2) Wallet — credit the refund straight back to the customer's wallet
+    } else if (returnReq.payment_method === 'wallet') {
+      await query(
+        `UPDATE wallets SET balance = balance + $1, total_credited = total_credited + $1, updated_at = NOW()
+         WHERE owner_id = $2 AND owner_type = 'customer'`,
+        [refundAmt, returnReq.user_id]
+      );
+      await query(
+        `INSERT INTO wallet_transactions
+           (wallet_id, transaction_type, amount, closing_balance, reference_type, reference_id, description)
+         SELECT w.id, 'credit', $1, w.balance + $1, 'order', $2, 'Return refund'
+         FROM wallets w WHERE w.owner_id = $3 AND w.owner_type = 'customer'`,
+        [refundAmt, returnReq.order_id, returnReq.user_id]
+      );
+      await query(
+        `UPDATE orders SET order_status = 'refund_initiated', updated_at = NOW() WHERE id = $1`,
+        [returnReq.order_id]
+      );
+
+    // 3) UPI-Direct / COD — platform never held the funds → merchant refunds manually
+    } else {
+      await query(
+        `UPDATE orders SET order_status = 'refund_manual_pending', updated_at = NOW() WHERE id = $1`,
+        [returnReq.order_id]
+      );
+      await query(
+        `INSERT INTO notifications (recipient_id, recipient_type, notification_type, title, body, data)
+         VALUES ($1, 'merchant', 'payment', $2, $3, $4)`,
+        [
+          returnReq.merchant_id,
+          '↩️ Manual refund required',
+          `Approved return needs a manual refund of ₹${refundAmt} to the customer (paid via ${returnReq.payment_method}).`,
+          JSON.stringify({ order_id: returnReq.order_id, return_request_id: rid, refund_type: 'manual' }),
+        ]
+      );
     }
   }
 

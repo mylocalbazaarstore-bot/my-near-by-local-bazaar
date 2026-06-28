@@ -90,7 +90,7 @@ const adminOrderListQuery = Joi.object({
   search:         Joi.string().max(100).optional(),
 });
 const adminOrderOverride = Joi.object({
-  target_status: Joi.string().valid('accepted','cancelled','refund_initiated','merchant_approved').required(),
+  target_status: Joi.string().valid('accepted','cancelled','refund_initiated','refund_manual_pending','refund_completed','merchant_approved').required(),
   note: Joi.string().min(5).max(1000).required(),
 });
 const adminRefundInitiate = Joi.object({
