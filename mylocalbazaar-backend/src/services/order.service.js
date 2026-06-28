@@ -811,9 +811,13 @@ const OrderService = {
 
   _triggerRefund: async (client, order, actorId, reason) => {
     try {
-      // Fetch Razorpay payment ID
+      let autoRefunded       = false;   // platform issued the refund itself
+      let manualRefundNeeded = false;   // merchant must refund the customer directly
+
+      // 1) Razorpay — refund the funds the platform captured (online payments)
       const { rows: payRows } = await client.query(
-        `SELECT razorpay_payment_id, amount FROM payments WHERE order_id = $1 AND payment_status = 'captured'`,
+        `SELECT razorpay_payment_id, amount FROM payments
+         WHERE order_id = $1 AND payment_status = 'captured' AND razorpay_payment_id IS NOT NULL`,
         [order.id]
       );
 
@@ -828,27 +832,70 @@ const OrderService = {
           `UPDATE payments
            SET payment_status = 'refunded', refunded_at = NOW(),
                refund_amount = $1, refund_reference_id = $2
-           WHERE order_id = $3`,
+           WHERE order_id = $3 AND razorpay_payment_id IS NOT NULL`,
           [payRows[0].amount, refund.id, order.id]
         );
+        autoRefunded = true;
       }
 
-      // Wallet orders — credit back
-      if (order.payment_method === 'wallet') {
-        await client.query(
-          `UPDATE wallets
-           SET balance       = balance + $1,
-               total_credited = total_credited + $1,
-               updated_at    = NOW()
-           WHERE owner_id = $2 AND owner_type = 'customer'`,
-          [order.total_amount, order.user_id]
-        );
-      }
-
-      await client.query(
-        `UPDATE orders SET order_status = 'refund_initiated', updated_at = NOW() WHERE id = $1`,
+      // 2) Customer platform-wallet — credit back any wallet amount actually
+      //    debited for this order (handles wallet-only AND partial-wallet orders)
+      const { rows: wRows } = await client.query(
+        `SELECT COALESCE(SUM(wt.amount), 0) AS wallet_paid
+         FROM wallet_transactions wt
+         JOIN wallets w ON w.id = wt.wallet_id
+         WHERE wt.reference_type = 'order' AND wt.reference_id = $1
+           AND wt.transaction_type = 'debit' AND w.owner_type = 'customer'`,
         [order.id]
       );
+      const walletPaid = parseFloat(wRows[0].wallet_paid);
+
+      if (walletPaid > 0) {
+        await client.query(
+          `UPDATE wallets
+           SET balance        = balance + $1,
+               total_credited = total_credited + $1,
+               updated_at     = NOW()
+           WHERE owner_id = $2 AND owner_type = 'customer'`,
+          [walletPaid, order.user_id]
+        );
+        await client.query(
+          `INSERT INTO wallet_transactions
+             (wallet_id, transaction_type, amount, closing_balance, reference_type, reference_id, description)
+           SELECT w.id, 'credit', $1, w.balance + $1, 'order', $2, 'Order refund'
+           FROM wallets w WHERE w.owner_id = $3 AND w.owner_type = 'customer'`,
+          [walletPaid, order.id, order.user_id]
+        );
+        autoRefunded = true;
+      }
+
+      // 3) UPI-Direct — the customer paid the MERCHANT's UPI directly, so the
+      //    platform holds no funds and CANNOT refund. The merchant must refund
+      //    manually. Never mark this 'refund_initiated' (that would be a lie).
+      if (order.payment_method === 'upi_direct') {
+        manualRefundNeeded = true;
+      }
+
+      // Final order status — honest about what actually happened
+      const finalStatus = manualRefundNeeded ? 'refund_manual_pending' : 'refund_initiated';
+      await client.query(
+        `UPDATE orders SET order_status = $1, updated_at = NOW() WHERE id = $2`,
+        [finalStatus, order.id]
+      );
+
+      // Ask the merchant to refund the UPI-Direct payment directly to the customer
+      if (manualRefundNeeded) {
+        await client.query(
+          `INSERT INTO notifications (recipient_id, recipient_type, notification_type, title, body, data)
+           VALUES ($1, 'merchant', 'payment', $2, $3, $4)`,
+          [
+            order.merchant_id,
+            '↩️ Manual refund required',
+            `Order ${order.order_number} was paid via UPI Direct. Please refund the customer to their UPI and mark it resolved.`,
+            JSON.stringify({ order_id: order.id, reason, refund_type: 'manual_upi_direct' }),
+          ]
+        );
+      }
 
     } catch (err) {
       logger.error('Refund trigger failed:', { orderId: order.id, error: err.message });
@@ -858,10 +905,51 @@ const OrderService = {
 
   _settleToMerchantWallet: async (client, order) => {
     try {
-      const commission = parseFloat(process.env.PLATFORM_COMMISSION_PERCENT || 8) / 100;
-      const gross      = parseFloat(order.total_amount) - parseFloat(order.delivery_charge);
-      const platformFee = parseFloat((gross * commission).toFixed(2));
-      const netPayable  = parseFloat((gross - platformFee).toFixed(2));
+      // ── SUBSCRIPTION-ONLY MODEL ──────────────────────────────
+      // The platform earns from SaaS plan fees, NOT from order commission.
+      // So we settle to the merchant ONLY the funds the platform actually
+      // COLLECTED for this order, and take 0% commission by default.
+      //
+      //   • razorpay            → amount captured into the platform account
+      //   • customer wallet     → wallet amount debited for this order
+      //   • cod / upi_direct    → platform collected NOTHING (merchant already
+      //                            holds the cash / UPI), so nothing to settle.
+      //
+      // PLATFORM_COMMISSION_PERCENT defaults to 0; it is left configurable only
+      // so a future Razorpay-Route / commission model can be switched on.
+      const commissionPct = parseFloat(process.env.PLATFORM_COMMISSION_PERCENT || 0) / 100;
+
+      // 1) Razorpay funds captured by the platform for this order
+      const { rows: payRows } = await client.query(
+        `SELECT COALESCE(SUM(amount), 0) AS collected
+         FROM payments
+         WHERE order_id = $1
+           AND payment_status = 'captured'
+           AND razorpay_payment_id IS NOT NULL`,
+        [order.id]
+      );
+
+      // 2) Customer platform-wallet amount debited for this order
+      //    (covers partial wallet payment on COD / UPI-Direct orders too)
+      const { rows: wRows } = await client.query(
+        `SELECT COALESCE(SUM(wt.amount), 0) AS wallet_collected
+         FROM wallet_transactions wt
+         JOIN wallets w ON w.id = wt.wallet_id
+         WHERE wt.reference_type = 'order'
+           AND wt.reference_id = $1
+           AND wt.transaction_type = 'debit'
+           AND w.owner_type = 'customer'`,
+        [order.id]
+      );
+
+      const platformCollected = parseFloat(payRows[0].collected) + parseFloat(wRows[0].wallet_collected);
+
+      // Pure COD / UPI-Direct (no wallet used): merchant already has the money.
+      if (platformCollected <= 0) return;
+
+      const platformFee = parseFloat((platformCollected * commissionPct).toFixed(2));
+      const netPayable  = parseFloat((platformCollected - platformFee).toFixed(2));
+      if (netPayable <= 0) return;
 
       await client.query(
         `UPDATE wallets
@@ -876,7 +964,7 @@ const OrderService = {
       await client.query(
         `INSERT INTO wallet_transactions
            (wallet_id, transaction_type, amount, closing_balance, reference_type, reference_id, description)
-         SELECT w.id, 'credit', $1, w.balance + $1, 'order', $2, 'Order settlement'
+         SELECT w.id, 'credit', $1, w.balance + $1, 'order', $2, 'Order settlement (platform-collected funds)'
          FROM wallets w WHERE w.owner_id = $3 AND w.owner_type = 'merchant'`,
         [netPayable, order.id, order.merchant_id]
       );
